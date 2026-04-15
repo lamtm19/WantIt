@@ -166,11 +166,26 @@
             <p class="text-sm text-gray-500 mb-3">Présentez-vous et décrivez l'article que vous souhaitez vendre.</p>
             <textarea
               v-model="contactMessage"
-              class="input resize-none mb-4"
+              class="input resize-none mb-3"
               rows="4"
               placeholder="Bonjour, j'ai exactement ce que vous cherchez..."
               maxlength="2000"
             />
+            <!-- Photos de l'article -->
+            <div class="mb-4">
+              <label class="label mb-1">Photos de votre article (optionnel)</label>
+              <label class="flex items-center gap-2 cursor-pointer border-2 border-dashed border-gray-200 rounded-xl p-3 hover:border-primary-300 transition">
+                <ImageIcon class="w-5 h-5 text-gray-400" />
+                <span class="text-sm text-gray-500">Ajouter des photos</span>
+                <input type="file" accept="image/*" multiple class="hidden" @change="onContactImages" />
+              </label>
+              <div v-if="contactImages.length" class="flex gap-2 mt-2 flex-wrap">
+                <div v-for="(img, i) in contactImages" :key="i" class="relative w-16 h-16">
+                  <img :src="img.preview" class="w-full h-full object-cover rounded-lg" />
+                  <button @click="removeContactImage(i)" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">✕</button>
+                </div>
+              </div>
+            </div>
             <div class="flex gap-3">
               <button class="btn-secondary flex-1" @click="showContactModal = false">Annuler</button>
               <button class="btn-primary flex-1" :disabled="!contactMessage.trim() || contactLoading" @click="sendContact">
@@ -198,6 +213,74 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Modal changement de statut -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="showStatusModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="showStatusModal = false">
+          <div class="card p-6 w-full max-w-sm">
+            <h3 class="font-bold text-lg mb-2">Gérer l'annonce</h3>
+            <p class="text-sm text-gray-500 mb-5">Que souhaitez-vous faire avec cette annonce ?</p>
+            <div class="space-y-3">
+              <button
+                class="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-green-200 bg-green-50 text-green-800 hover:bg-green-100 transition text-left"
+                @click="changeStatus('found')"
+                :disabled="statusLoading"
+              >
+                <span class="text-2xl">✅</span>
+                <div>
+                  <p class="font-semibold">J'ai trouvé ce que je cherchais</p>
+                  <p class="text-xs text-green-600">L'annonce passera en "Trouvée"</p>
+                </div>
+              </button>
+              <button
+                class="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 transition text-left"
+                @click="changeStatus('cancelled')"
+                :disabled="statusLoading"
+              >
+                <span class="text-2xl">🚫</span>
+                <div>
+                  <p class="font-semibold">Je n'en ai plus besoin</p>
+                  <p class="text-xs text-gray-500">L'annonce sera annulée</p>
+                </div>
+              </button>
+              <button
+                class="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition text-left"
+                @click="confirmDelete"
+                :disabled="statusLoading"
+              >
+                <span class="text-2xl">🗑️</span>
+                <div>
+                  <p class="font-semibold">Supprimer définitivement</p>
+                  <p class="text-xs text-red-500">Cette action est irréversible</p>
+                </div>
+              </button>
+            </div>
+            <button class="btn-secondary w-full mt-4" @click="showStatusModal = false">Annuler</button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Modal confirmation suppression -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div class="card p-6 w-full max-w-sm text-center">
+            <p class="text-4xl mb-3">⚠️</p>
+            <h3 class="font-bold text-lg mb-2">Supprimer l'annonce ?</h3>
+            <p class="text-sm text-gray-500 mb-5">Cette action est définitive et ne peut pas être annulée.</p>
+            <div class="flex gap-3">
+              <button class="btn-secondary flex-1" @click="showDeleteConfirm = false">Annuler</button>
+              <button class="btn-danger flex-1" :disabled="statusLoading" @click="handleDelete">
+                <Loader v-if="statusLoading" class="w-4 h-4 animate-spin" />
+                <span v-else>Supprimer</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 
   <!-- Loading -->
@@ -218,7 +301,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ImageOff, MapPin, Navigation, Zap, MessageSquare, Pencil, Flag, Loader } from 'lucide-vue-next'
+import { ImageOff, MapPin, Navigation, Zap, MessageSquare, Pencil, Flag, Loader, Image as ImageIcon } from 'lucide-vue-next'
 import { useToast } from 'vue-toastification'
 import { useAuthStore } from '@/stores/auth'
 import { useListingStore } from '@/stores/listings'
@@ -233,15 +316,18 @@ const auth   = useAuthStore()
 const store  = useListingStore()
 const convStore = useConversationStore()
 
-const listing         = ref(null)
-const loading         = ref(true)
-const activeImg       = ref(0)
+const listing          = ref(null)
+const loading          = ref(true)
+const activeImg        = ref(0)
 const showContactModal = ref(false)
 const showReportModal  = ref(false)
 const showStatusModal  = ref(false)
-const contactMessage  = ref('')
-const contactLoading  = ref(false)
-const reportReason    = ref('')
+const showDeleteConfirm = ref(false)
+const contactMessage   = ref('')
+const contactLoading   = ref(false)
+const contactImages    = ref([]) // [{ file, preview, base64 }]
+const reportReason     = ref('')
+const statusLoading    = ref(false)
 
 const isOwner = computed(() => listing.value?.user_id === auth.profile?.id)
 const images  = computed(() => (listing.value?.listing_images || []).sort((a, b) => a.sort_order - b.sort_order))
@@ -280,14 +366,57 @@ onMounted(async () => {
   finally { loading.value = false }
 })
 
+function onContactImages(e) {
+  const files = Array.from(e.target.files)
+  for (const file of files) {
+    const preview = URL.createObjectURL(file)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      contactImages.value.push({
+        file,
+        preview,
+        base64: ev.target.result.split(',')[1],
+        filename: file.name
+      })
+    }
+    reader.readAsDataURL(file)
+  }
+  e.target.value = ''
+}
+
+function removeContactImage(index) {
+  const img = contactImages.value[index]
+  if (img?.preview) URL.revokeObjectURL(img.preview)
+  contactImages.value.splice(index, 1)
+}
+
 async function sendContact() {
   if (!contactMessage.value.trim()) return
   contactLoading.value = true
   try {
+    // 1. Créer la conversation avec le message texte
     const res = await convStore.startConversation(listing.value.id, contactMessage.value)
+    const convId = res.conversation.id
+
+    // 2. Envoyer les images si sélectionnées
+    for (const img of contactImages.value) {
+      try {
+        const uploadRes = await api.post(`/api/conversations/${convId}/images`, {
+          base64: img.base64,
+          filename: img.filename
+        })
+        await convStore.sendMessage(convId, {
+          type: 'image',
+          image_url: uploadRes.data.url,
+          content: null
+        })
+      } catch {}
+    }
+
     showContactModal.value = false
+    contactImages.value = []
     toast.success('Message envoyé !')
-    router.push(`/messages/${res.conversation.id}`)
+    router.push(`/messages/${convId}`)
   } catch (err) {
     if (err.response?.data?.conversation_id) {
       router.push(`/messages/${err.response.data.conversation_id}`)
@@ -296,6 +425,39 @@ async function sendContact() {
     }
   } finally {
     contactLoading.value = false
+  }
+}
+
+async function changeStatus(status) {
+  statusLoading.value = true
+  try {
+    await store.updateStatus(listing.value.id, status)
+    listing.value.status = status
+    showStatusModal.value = false
+    toast.success(status === 'found' ? 'Annonce marquée comme trouvée !' : 'Annonce annulée')
+  } catch {
+    toast.error('Erreur lors du changement de statut')
+  } finally {
+    statusLoading.value = false
+  }
+}
+
+function confirmDelete() {
+  showStatusModal.value = false
+  showDeleteConfirm.value = true
+}
+
+async function handleDelete() {
+  statusLoading.value = true
+  try {
+    await store.deleteListing(listing.value.id)
+    showDeleteConfirm.value = false
+    toast.success('Annonce supprimée')
+    router.push('/profile')
+  } catch {
+    toast.error('Erreur lors de la suppression')
+  } finally {
+    statusLoading.value = false
   }
 }
 

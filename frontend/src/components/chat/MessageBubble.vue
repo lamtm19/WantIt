@@ -24,12 +24,12 @@
         <div class="mt-2">
           <span v-if="message.offer_status === 'accepted'" class="badge badge-green">✓ Acceptée</span>
           <span v-else-if="message.offer_status === 'rejected'" class="badge badge-red">✕ Refusée</span>
-          <span v-else-if="message.offer_status === 'countered'" class="badge badge-orange">↩ Contre-offre</span>
-          <span v-else-if="message.offer_status === 'pending'" class="badge badge-gray">En attente</span>
+          <span v-else-if="message.offer_status === 'countered'" class="badge badge-orange">↩ Contre-offre envoyée</span>
+          <span v-else class="badge badge-gray">En attente</span>
         </div>
 
-        <!-- Actions (acheteur uniquement, offre en attente) -->
-        <div v-if="canRespond && message.offer_status === 'pending'" class="mt-3 flex flex-col gap-2">
+        <!-- Actions si on peut répondre (offre en attente) -->
+        <div v-if="canRespond" class="mt-3 flex flex-col gap-2">
           <div class="flex gap-2">
             <button class="btn-primary btn-sm flex-1" @click="$emit('accept', message)">Accepter</button>
             <button class="btn-secondary btn-sm flex-1" @click="$emit('reject', message)">Refuser</button>

@@ -45,8 +45,19 @@ router.patch('/:id/messages/:msgId/offer',
   ctrl.respondToOffer
 )
 
+// Récupérer la transaction d'une conversation
+router.get('/:id/transaction', requireAuth, ctrl.getTransaction)
+
 // Valider une transaction
 router.post('/:id/validate', requireAuth, ctrl.validateTransaction)
+
+// Upload image dans une conversation
+router.post('/:id/images',
+  requireAuth,
+  [body('base64').notEmpty(), body('filename').notEmpty()],
+  validate,
+  ctrl.uploadChatImage
+)
 
 // Signaler une conversation
 router.post('/:id/report', requireAuth, ctrl.reportConversation)

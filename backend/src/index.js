@@ -1,4 +1,14 @@
 require('dotenv').config()
+
+// ── Vérification des variables d'environnement requises ──────
+const REQUIRED_ENV = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'FRONTEND_URL']
+const missing = REQUIRED_ENV.filter(k => !process.env[k])
+if (missing.length > 0) {
+  console.error('❌ Variables d\'environnement manquantes :', missing.join(', '))
+  console.error('   Créez un fichier .env avec ces variables.')
+  process.exit(1)
+}
+
 const express    = require('express')
 const http       = require('http')
 const cors       = require('cors')
@@ -18,6 +28,10 @@ const io = new Server(server, {
   }
 })
 require('./socket/socketHandler')(io)
+
+// Injecter io dans le controller de conversations pour les émissions temps réel
+const convCtrl = require('./controllers/conversationController')
+convCtrl.setIo(io)
 
 // ── Middleware globaux ───────────────────────────────────────
 app.use(helmet())
@@ -54,10 +68,21 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', env: process.env.N
 // 404
 app.use((req, res) => res.status(404).json({ error: 'Route introuvable' }))
 
-// Gestion des erreurs
+// Gestion des erreurs globale
 app.use((err, req, res, next) => {
-  console.error(err)
-  res.status(err.status || 500).json({ error: err.message || 'Erreur interne du serveur' })
+  const status = err.status || err.statusCode || 500
+  const message = err.message || 'Erreur interne du serveur'
+
+  // Log structuré pour identification facile
+  console.error(`[${new Date().toISOString()}] ${status} ${req.method} ${req.path}`)
+  console.error('  Message:', message)
+  if (err.stack) console.error('  Stack:', err.stack.split('\n').slice(0, 3).join('\n'))
+
+  res.status(status).json({
+    error: status === 500 ? 'Erreur interne du serveur' : message,
+    // En développement, exposer plus de détails
+    ...(process.env.NODE_ENV !== 'production' && { detail: message })
+  })
 })
 
 // ── Démarrage ───────────────────────────────────────────────

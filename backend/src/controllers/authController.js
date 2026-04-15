@@ -30,7 +30,8 @@ exports.register = async (req, res) => {
       email,
       password,
       options: {
-        data: { username, city, postal_code, region, latitude, longitude }
+        data: { username, city, postal_code, region, latitude, longitude },
+        emailRedirectTo: `${process.env.FRONTEND_URL}/confirm-email`
       }
     })
 
@@ -45,34 +46,46 @@ exports.register = async (req, res) => {
       return res.status(500).json({ error: 'Une erreur est survenue lors de la création du compte' })
     }
 
-    // Vérifier que l'utilisateur existe (timing Supabase)
-    await new Promise(resolve => setTimeout(resolve, 500))
-    const { data: userCheck } = await supabase.auth.admin.getUserById(authData.user.id)
-    if (!userCheck.user) {
-      return res.status(500).json({ error: 'Utilisateur non créé (retry)' })
-    }
-
-    // Créer le profil (id maintenant garanti)
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: authData.user.id,
-      username,
-      city,
-      postal_code,
-      region,
-      latitude,
-      longitude
+    // Créer le profil via la fonction SECURITY DEFINER (contourne les RLS)
+    // Cette fonction doit être créée via database/migrations/001_fixes.sql
+    const { error: profileError } = await supabase.rpc('create_user_profile', {
+      p_id:          authData.user.id,
+      p_username:    username,
+      p_city:        city        || null,
+      p_postal_code: postal_code || null,
+      p_region:      region      || null,
+      p_latitude:    latitude    || null,
+      p_longitude:   longitude   || null
     })
 
     if (profileError) {
-      console.error('Profile insert error:', profileError)
-      try {
-        // Rollback sûr
-        await supabase.from('profiles').delete().eq('id', authData.user.id)
-      } catch (delErr) {
-        console.error('Cleanup failed:', delErr)
+      console.error('Profile RPC error:', profileError)
+      // Tenter une insertion directe comme fallback (si service key configurée)
+      const { error: directError } = await supabase.from('profiles').insert({
+        id: authData.user.id,
+        username,
+        city:        city        || null,
+        postal_code: postal_code || null,
+        region:      region      || null,
+        latitude:    latitude    || null,
+        longitude:   longitude   || null
+      })
+
+      if (directError) {
+        console.error('Profile direct insert error:', directError)
+        // Rollback : supprimer l'utilisateur auth créé
+        try {
+          await supabase.auth.admin.deleteUser(authData.user.id)
+        } catch (rollbackErr) {
+          console.error('Rollback failed (deleteUser):', rollbackErr)
+        }
+        if (directError.code === '42501') {
+          return res.status(500).json({
+            error: 'Erreur de configuration base de données. Exécutez database/migrations/001_fixes.sql dans Supabase.'
+          })
+        }
+        return res.status(500).json({ error: 'Erreur lors de la création du profil. Réessayez.' })
       }
-      await supabase.auth.admin.deleteUser(authData.user.id)
-      return res.status(500).json({ error: 'Erreur profil : ' + profileError.message + '. Réessayez.' })
     }
 
     // Si on attend une confirmation par mail, on ne retourne pas de session
@@ -119,30 +132,30 @@ exports.logout = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.FRONTEND_URL}/reset-password`
     })
     // Toujours retourner succès pour ne pas exposer les emails
     res.json({ message: 'Si un compte existe, un email a été envoyé.' })
   } catch (err) {
+    console.error('forgotPassword error:', err)
     res.status(500).json({ error: 'Erreur interne' })
   }
 }
 
 exports.resetPassword = async (req, res) => {
   try {
-    const { password } = req.body
-    const token = req.headers.authorization?.split(' ')[1]
+    const { password, access_token } = req.body
 
     const { error } = await supabase.auth.admin.updateUserById(
-      // Le token est fourni via le lien de reset
-      req.body.access_token,
+      access_token,
       { password }
     )
 
     if (error) return res.status(400).json({ error: error.message })
     res.json({ message: 'Mot de passe mis à jour' })
   } catch (err) {
+    console.error('resetPassword error:', err)
     res.status(500).json({ error: 'Erreur interne' })
   }
 }
@@ -164,13 +177,30 @@ exports.changePassword = async (req, res) => {
 
 exports.deleteAccount = async (req, res) => {
   try {
-    // Supprimer le profil (cascade sur les données liées)
-    await supabase.from('profiles').delete().eq('id', req.user.id)
-    // Supprimer l'utilisateur Auth
-    await supabase.auth.admin.deleteUser(req.user.id)
-    res.json({ message: 'Compte supprimé' })
+    const userId = req.user.id
+
+    // 1. Supprimer le profil : cascade DB supprime listings, conversations, messages
+    const { error: profileDelError } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', userId)
+
+    if (profileDelError) {
+      console.error('deleteAccount - profile delete error:', profileDelError)
+      // On continue quand même pour supprimer l'auth user
+    }
+
+    // 2. Supprimer l'utilisateur Auth (nécessite la service key)
+    const { error: authDelError } = await supabase.auth.admin.deleteUser(userId)
+    if (authDelError) {
+      console.error('deleteAccount - auth delete error:', authDelError)
+      return res.status(500).json({ error: 'Erreur lors de la suppression du compte auth' })
+    }
+
+    res.json({ message: 'Compte supprimé définitivement' })
   } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
+    console.error('deleteAccount error:', err)
+    res.status(500).json({ error: 'Erreur lors de la suppression du compte' })
   }
 }
 

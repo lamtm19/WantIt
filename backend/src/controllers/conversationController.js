@@ -1,5 +1,10 @@
 const supabase      = require('../config/supabase')
 const emailService  = require('../services/emailService')
+const { v4: uuidv4 } = require('uuid')
+
+// Référence à l'instance Socket.io (injectée depuis index.js)
+let _io = null
+exports.setIo = (io) => { _io = io }
 
 exports.getConversations = async (req, res) => {
   try {
@@ -204,9 +209,9 @@ exports.sendMessage = async (req, res) => {
       return res.status(400).json({ error: 'Cette annonce n\'est plus active' })
     }
 
-    // Seul le vendeur peut envoyer des offres
-    if (type === 'offer' && req.user.id !== conv.seller_id) {
-      return res.status(400).json({ error: 'Seul le vendeur peut proposer une offre' })
+    // Les offres peuvent venir du vendeur OU de l'acheteur
+    if (type === 'offer' && req.user.id !== conv.seller_id && req.user.id !== conv.buyer_id) {
+      return res.status(403).json({ error: 'Non autorisé' })
     }
 
     const { data: msg, error } = await supabase
@@ -229,6 +234,11 @@ exports.sendMessage = async (req, res) => {
       .from('conversations')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', id)
+
+    // Émettre le message via socket pour la mise à jour en temps réel
+    if (_io) {
+      _io.to(`conv:${id}`).emit('new:message', msg)
+    }
 
     // Notification email
     const recipientId = req.user.id === conv.buyer_id ? conv.seller_id : conv.buyer_id
@@ -274,8 +284,7 @@ exports.respondToOffer = async (req, res) => {
       .eq('id', id)
       .single()
 
-    // Seul l'acheteur peut répondre aux offres
-    if (!conv || conv.buyer_id !== req.user.id) {
+    if (!conv || (conv.buyer_id !== req.user.id && conv.seller_id !== req.user.id)) {
       return res.status(403).json({ error: 'Non autorisé' })
     }
 
@@ -290,6 +299,11 @@ exports.respondToOffer = async (req, res) => {
       return res.status(404).json({ error: 'Offre introuvable' })
     }
 
+    // On ne peut pas répondre à sa propre offre
+    if (offer.sender_id === req.user.id) {
+      return res.status(400).json({ error: 'Vous ne pouvez pas répondre à votre propre offre' })
+    }
+
     let offerStatus = 'pending'
     if (action === 'accept') offerStatus = 'accepted'
     else if (action === 'reject') offerStatus = 'rejected'
@@ -299,6 +313,34 @@ exports.respondToOffer = async (req, res) => {
       .from('messages')
       .update({ offer_status: offerStatus })
       .eq('id', msgId)
+
+    const now = new Date().toISOString()
+
+    // Si offre acceptée → message système pour organiser le RDV
+    if (action === 'accept') {
+      const { data: acceptorProfile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', req.user.id)
+        .single()
+
+      const { data: sysMsg } = await supabase.from('messages').insert({
+        conversation_id: id,
+        sender_id: req.user.id,
+        type: 'system',
+        content: `🤝 Prix de ${offer.offer_amount}€ accepté par ${acceptorProfile?.username} ! Organisez votre rendez-vous en main propre. Une fois l'échange effectué, l'acheteur pourra valider la transaction et vous pourrez vous laisser des avis mutuellement.`
+      }).select().single()
+
+      await supabase.from('conversations').update({ last_message_at: now }).eq('id', id)
+
+      // Émettre la mise à jour du statut et le message système via socket
+      if (_io) {
+        _io.to(`conv:${id}`).emit('offer:updated', { message_id: msgId, offer_status: 'accepted' })
+        if (sysMsg) _io.to(`conv:${id}`).emit('new:message', sysMsg)
+      }
+
+      return res.json({ status: 'accepted', agreed_price: offer.offer_amount, system_message: sysMsg })
+    }
 
     // Si contre-offre, créer un nouveau message
     if (action === 'counter' && counter_amount) {
@@ -314,11 +356,21 @@ exports.respondToOffer = async (req, res) => {
         .select(`*, sender:sender_id (id, username, avatar_url)`)
         .single()
 
-      await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', id)
+      await supabase.from('conversations').update({ last_message_at: now }).eq('id', id)
+
+      if (_io && counterMsg) {
+        _io.to(`conv:${id}`).emit('new:message', counterMsg)
+      }
+
       return res.json({ status: 'countered', counter_message: counterMsg })
     }
 
-    await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', id)
+    // Si refus → notifier via socket
+    if (_io) {
+      _io.to(`conv:${id}`).emit('offer:updated', { message_id: msgId, offer_status: 'rejected' })
+    }
+
+    await supabase.from('conversations').update({ last_message_at: now }).eq('id', id)
     res.json({ status: offerStatus })
   } catch (err) {
     res.status(500).json({ error: 'Erreur interne' })
@@ -369,12 +421,18 @@ exports.validateTransaction = async (req, res) => {
     await supabase.from('listings').update({ status: 'found' }).eq('id', conv.listing_id)
 
     // Message système dans la conversation
-    await supabase.from('messages').insert({
+    const { data: sysMsg } = await supabase.from('messages').insert({
       conversation_id: id,
       sender_id: req.user.id,
       type: 'system',
-      content: '✅ Transaction validée. Vous pouvez maintenant laisser un avis.'
-    })
+      content: `✅ Transaction validée ! Vous pouvez maintenant laisser un avis à l'autre utilisateur.`
+    }).select().single()
+
+    // Émettre via socket pour mise à jour en temps réel
+    if (_io) {
+      if (sysMsg) _io.to(`conv:${id}`).emit('new:message', sysMsg)
+      _io.to(`conv:${id}`).emit('transaction:validated', { transaction: tx })
+    }
 
     // Notification email au vendeur
     const { data: sellerAuth } = await supabase.auth.admin.getUserById(conv.seller_id)
@@ -414,5 +472,69 @@ exports.reportConversation = async (req, res) => {
     res.json({ message: 'Conversation signalée' })
   } catch (err) {
     res.status(500).json({ error: 'Erreur interne' })
+  }
+}
+
+exports.getTransaction = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('buyer_id, seller_id')
+      .eq('id', id)
+      .single()
+
+    if (!conv || (conv.buyer_id !== req.user.id && conv.seller_id !== req.user.id)) {
+      return res.status(403).json({ error: 'Non autorisé' })
+    }
+
+    const { data: tx } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('conversation_id', id)
+      .single()
+
+    if (!tx) return res.status(404).json({ error: 'Aucune transaction' })
+    res.json(tx)
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur interne' })
+  }
+}
+
+exports.uploadChatImage = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { base64, filename } = req.body
+
+    // Vérifier accès
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('buyer_id, seller_id')
+      .eq('id', id)
+      .single()
+
+    if (!conv || (conv.buyer_id !== req.user.id && conv.seller_id !== req.user.id)) {
+      return res.status(403).json({ error: 'Non autorisé' })
+    }
+
+    const buffer = Buffer.from(base64, 'base64')
+    const ext = filename.split('.').pop() || 'jpg'
+    const path = `chat/${id}/${uuidv4()}.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('wantit-images')
+      .upload(path, buffer, { contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`, upsert: false })
+
+    if (uploadError) throw uploadError
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('wantit-images')
+      .getPublicUrl(path)
+
+    res.json({ url: publicUrl })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erreur lors de l\'upload' })
   }
 }

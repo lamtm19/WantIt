@@ -27,6 +27,10 @@ exports.getListings = async (req, res) => {
         listing_brands (brand_name, brands:brand_id (name))
       `)
       .eq('status', 'active')
+      .not('profiles', 'is', null) // exclure les annonces dont le propriétaire est supprimé
+
+    // Ne pas montrer ses propres annonces sur la page principale
+    if (req.user?.id) query = query.neq('user_id', req.user.id)
 
     if (category_id) query = query.eq('category_id', category_id)
     if (is_urgent === 'true') query = query.eq('is_urgent', true)
@@ -69,7 +73,7 @@ exports.searchListings = async (req, res) => {
   try {
     const { q, ...filters } = req.query
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('listings')
       .select(`
         *,
@@ -78,10 +82,14 @@ exports.searchListings = async (req, res) => {
         listing_images (url, sort_order)
       `)
       .eq('status', 'active')
+      .not('profiles', 'is', null)
       .or(`title.ilike.%${q}%,description.ilike.%${q}%`)
       .order('created_at', { ascending: false })
       .limit(50)
 
+    if (req.user?.id) query = query.neq('user_id', req.user.id)
+
+    const { data, error } = await query
     if (error) throw error
     res.json({ data: data || [] })
   } catch (err) {
@@ -305,10 +313,14 @@ exports.deleteListing = async (req, res) => {
       return res.status(403).json({ error: 'Non autorisé' })
     }
 
-    await supabase.from('listings').update({ status: 'cancelled' }).eq('id', id)
-    res.json({ message: 'Annonce supprimée' })
+    // Suppression réelle (cascade sur images, conversations, messages via FK)
+    const { error } = await supabase.from('listings').delete().eq('id', id)
+    if (error) throw error
+
+    res.json({ message: 'Annonce supprimée définitivement' })
   } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
+    console.error('deleteListing error:', err)
+    res.status(500).json({ error: 'Erreur lors de la suppression' })
   }
 }
 

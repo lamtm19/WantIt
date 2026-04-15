@@ -43,7 +43,14 @@ export const useConversationStore = defineStore('conversations', () => {
 
   async function sendMessage(conversationId, payload) {
     const res = await api.post(`/api/conversations/${conversationId}/messages`, payload)
-    return res.data
+    const msg = res.data
+    // Mettre à jour la liste des conversations
+    const conv = conversations.value.find(c => c.id === conversationId)
+    if (conv) {
+      conv.last_message_at = msg.created_at
+      conv.messages = [msg]
+    }
+    return msg
   }
 
   async function respondToOffer(conversationId, messageId, action, counterAmount = null) {
