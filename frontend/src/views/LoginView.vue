@@ -35,7 +35,20 @@
             <RouterLink to="/forgot-password" class="text-sm text-primary-600 hover:underline">Mot de passe oublié ?</RouterLink>
           </div>
 
-          <p v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded-xl">{{ error }}</p>
+          <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded-xl">
+            <p>{{ error }}</p>
+            <div v-if="emailNotConfirmed" class="mt-2 pt-2 border-t border-red-200">
+              <button
+                type="button"
+                class="text-sm text-primary-600 hover:underline font-medium"
+                :disabled="resendLoading"
+                @click="resendConfirmation"
+              >
+                {{ resendLoading ? 'Envoi...' : 'Renvoyer l\'email de confirmation' }}
+              </button>
+              <p v-if="resendMsg" class="text-xs text-green-600 mt-1">{{ resendMsg }}</p>
+            </div>
+          </div>
 
           <button type="submit" class="btn-primary w-full btn-lg" :disabled="loading">
             <Loader v-if="loading" class="w-5 h-5 animate-spin" />
@@ -53,22 +66,30 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Eye, EyeOff, Loader } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import api from '@/services/api'
 
 const auth   = useAuthStore()
 const router = useRouter()
 const route  = useRoute()
 
 const form = ref({ email: '', password: '' })
-const loading     = ref(false)
-const error       = ref('')
+const loading      = ref(false)
+const error        = ref('')
 const showPassword = ref(false)
+const resendLoading = ref(false)
+const resendMsg     = ref('')
+
+const emailNotConfirmed = computed(() =>
+  error.value.toLowerCase().includes('confirm')
+)
 
 async function handleLogin() {
   error.value   = ''
+  resendMsg.value = ''
   loading.value = true
   try {
     await auth.login(form.value.email, form.value.password)
@@ -78,6 +99,19 @@ async function handleLogin() {
     error.value = err.response?.data?.error || 'Une erreur est survenue'
   } finally {
     loading.value = false
+  }
+}
+
+async function resendConfirmation() {
+  resendLoading.value = true
+  resendMsg.value     = ''
+  try {
+    await api.post('/api/auth/resend-confirmation', { email: form.value.email })
+    resendMsg.value = 'Email renvoyé ! Vérifiez votre boîte mail.'
+  } catch {
+    resendMsg.value = 'Erreur lors de l\'envoi. Réessayez.'
+  } finally {
+    resendLoading.value = false
   }
 }
 </script>

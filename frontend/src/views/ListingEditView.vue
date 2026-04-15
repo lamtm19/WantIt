@@ -3,6 +3,8 @@
     <h1 class="text-2xl font-black text-gray-900 mb-6">Modifier la recherche</h1>
 
     <form @submit.prevent="handleSubmit" class="space-y-6">
+
+      <!-- Infos principales -->
       <div class="card p-5 space-y-4">
         <div>
           <label class="label">Titre <span class="text-red-500">*</span></label>
@@ -25,6 +27,7 @@
         </label>
       </div>
 
+      <!-- Budget -->
       <div class="card p-5">
         <h2 class="font-bold mb-4">Budget</h2>
         <div class="flex gap-3 items-center">
@@ -40,6 +43,7 @@
         </div>
       </div>
 
+      <!-- États -->
       <div class="card p-5">
         <h2 class="font-bold mb-4">État souhaité</h2>
         <div class="space-y-2">
@@ -50,12 +54,68 @@
         </div>
       </div>
 
+      <!-- Distance -->
       <div class="card p-5">
         <h2 class="font-bold mb-4">Distance maximale</h2>
         <div class="relative max-w-[200px]">
           <input v-model.number="form.max_distance_km" type="number" class="input pr-12" min="1" />
           <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">km</span>
         </div>
+      </div>
+
+      <!-- Photos -->
+      <div class="card p-5">
+        <h2 class="font-bold text-gray-900 mb-1">Photos</h2>
+        <p class="text-sm text-gray-500 mb-4">Gérez les photos de votre annonce</p>
+
+        <div class="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          <!-- Images existantes -->
+          <div
+            v-for="img in existingImages"
+            :key="img.id"
+            class="aspect-square rounded-xl overflow-hidden relative group border border-gray-200"
+          >
+            <img :src="img.url" class="w-full h-full object-cover" />
+            <button
+              type="button"
+              class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
+              @click="removeExistingImage(img)"
+            >
+              <Trash2 class="w-5 h-5 text-white" />
+            </button>
+          </div>
+
+          <!-- Nouvelles images à uploader -->
+          <div
+            v-for="(img, i) in newImages"
+            :key="'new-' + i"
+            class="aspect-square rounded-xl overflow-hidden relative group border border-primary-200"
+          >
+            <img :src="img.preview" class="w-full h-full object-cover" />
+            <div class="absolute top-1 left-1 bg-primary-500 text-white text-xs px-1.5 py-0.5 rounded-full">Nouveau</div>
+            <button
+              type="button"
+              class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
+              @click="removeNewImage(i)"
+            >
+              <Trash2 class="w-5 h-5 text-white" />
+            </button>
+          </div>
+
+          <!-- Bouton ajouter -->
+          <label
+            v-if="existingImages.length + newImages.length < 8"
+            class="aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary-400 transition"
+          >
+            <Plus class="w-6 h-6 text-gray-400" />
+            <span class="text-xs text-gray-400">Ajouter</span>
+            <input type="file" accept="image/*" multiple class="hidden" @change="handleNewImages" />
+          </label>
+        </div>
+
+        <p v-if="imagesToDelete.length" class="text-xs text-red-500 mt-2">
+          {{ imagesToDelete.length }} photo(s) seront supprimées à l'enregistrement
+        </p>
       </div>
 
       <!-- Statut -->
@@ -84,20 +144,27 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Loader } from 'lucide-vue-next'
+import { Loader, Trash2, Plus } from 'lucide-vue-next'
 import { useToast } from 'vue-toastification'
 import { useListingStore } from '@/stores/listings'
+import api from '@/services/api'
 
 const route  = useRoute()
 const router = useRouter()
 const store  = useListingStore()
 const toast  = useToast()
 
-const listing = ref(null)
-const loading = ref(false)
-const error   = ref('')
+const listing       = ref(null)
+const loading       = ref(false)
+const error         = ref('')
+const existingImages = ref([])   // images déjà dans la DB
+const imagesToDelete = ref([])   // images existantes à supprimer
+const newImages      = ref([])   // nouvelles images à uploader
 
-const form = ref({ title: '', description: '', category_id: '', price_min: 0, price_max: 0, max_distance_km: 50, conditions: [], is_urgent: false, status: 'active' })
+const form = ref({
+  title: '', description: '', category_id: '', price_min: 0,
+  price_max: 0, max_distance_km: 50, conditions: [], is_urgent: false, status: 'active'
+})
 
 const CONDITIONS = [
   { value: 'new_with_tags',    label: 'Neuf avec étiquette' },
@@ -123,20 +190,73 @@ onMounted(async () => {
     is_urgent:       listing.value.is_urgent,
     status:          listing.value.status
   })
+  // Charger les images existantes (triées par sort_order)
+  existingImages.value = [...(listing.value.listing_images || [])]
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 })
+
+function removeExistingImage(img) {
+  existingImages.value = existingImages.value.filter(i => i.id !== img.id)
+  imagesToDelete.value.push(img)
+}
+
+function removeNewImage(index) {
+  newImages.value.splice(index, 1)
+}
+
+function handleNewImages(e) {
+  for (const file of e.target.files) {
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      newImages.value.push({
+        preview: ev.target.result,
+        file,
+        base64: ev.target.result.split(',')[1]
+      })
+    }
+    reader.readAsDataURL(file)
+  }
+  e.target.value = ''
+}
 
 async function handleSubmit() {
   loading.value = true
   error.value   = ''
   try {
-    await store.updateListing(listing.value.id, form.value)
+    // 1. Mettre à jour les infos textuelles
+    await store.updateListing(listing.value.id, {
+      title:           form.value.title,
+      description:     form.value.description || null,
+      category_id:     form.value.category_id || undefined,
+      price_min:       form.value.price_min,
+      price_max:       form.value.price_max,
+      max_distance_km: form.value.max_distance_km,
+      conditions:      form.value.conditions,
+      is_urgent:       form.value.is_urgent
+    })
+
+    // 2. Changer le statut si modifié
     if (form.value.status !== listing.value.status) {
       await store.updateStatus(listing.value.id, form.value.status)
     }
+
+    // 3. Supprimer les images marquées pour suppression
+    for (const img of imagesToDelete.value) {
+      await api.delete(`/api/listings/${listing.value.id}/images/${img.id}`).catch(() => {})
+    }
+
+    // 4. Uploader les nouvelles images
+    if (newImages.value.length > 0) {
+      await store.uploadImages(listing.value.id, newImages.value.map(img => ({
+        base64: img.base64,
+        filename: img.file.name
+      })))
+    }
+
     toast.success('Annonce mise à jour !')
     router.push(`/listings/${listing.value.id}`)
   } catch (err) {
-    error.value = err.response?.data?.error || 'Erreur'
+    error.value = err.response?.data?.error || 'Erreur lors de la mise à jour'
   } finally {
     loading.value = false
   }

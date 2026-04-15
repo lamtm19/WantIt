@@ -11,7 +11,7 @@ router.post('/',
   [
     body('transaction_id').isUUID(),
     body('rating').isInt({ min: 1, max: 5 }),
-    body('comment').optional().isLength({ max: 1000 }).trim()
+    body('comment').optional({ nullable: true }).isLength({ max: 1000 }).trim()
   ],
   validate,
   ctrl.createReview
@@ -22,7 +22,7 @@ router.put('/:id',
   requireAuth,
   [
     body('rating').optional().isInt({ min: 1, max: 5 }),
-    body('comment').optional().isLength({ max: 1000 }).trim()
+    body('comment').optional({ nullable: true }).isLength({ max: 1000 }).trim()
   ],
   validate,
   ctrl.updateReview

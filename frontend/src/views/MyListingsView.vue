@@ -66,8 +66,8 @@
     <ConfirmModal
       v-model="showDeleteModal"
       title="Supprimer l'annonce"
-      message="Cette annonce sera marquée comme annulée. Cette action est irréversible."
-      confirm-label="Supprimer"
+      message="Cette annonce sera définitivement supprimée. Cette action est irréversible."
+      confirm-label="Supprimer définitivement"
       danger
       @confirm="confirmDelete"
     />

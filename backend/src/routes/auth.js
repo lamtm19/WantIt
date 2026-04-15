@@ -57,4 +57,10 @@ router.get('/me', requireAuth, ctrl.getMe)
 
 router.post('/confirm-email', ctrl.confirmEmail)
 
+router.post('/resend-confirmation',
+  [body('email').isEmail().normalizeEmail()],
+  validate,
+  ctrl.resendConfirmation
+)
+
 module.exports = router

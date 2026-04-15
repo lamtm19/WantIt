@@ -13,9 +13,12 @@ exports.getListings = async (req, res) => {
   try {
     const {
       category_id, condition, min_price, max_price,
-      brand, is_urgent, lat, lon, distance,
+      brand, is_urgent, distance,
       page = 1, limit = 20, sort = 'recent'
     } = req.query
+
+    let lat = req.query.lat
+    let lon = req.query.lon
 
     let query = supabase
       .from('listings')
@@ -37,6 +40,14 @@ exports.getListings = async (req, res) => {
     if (min_price) query = query.gte('price_max', min_price)
     if (max_price) query = query.lte('price_min', max_price)
 
+    // Filtre par état : le frontend envoie "new_with_tags,very_good" etc.
+    if (condition) {
+      const conditionArray = condition.split(',').filter(Boolean)
+      if (conditionArray.length > 0) {
+        query = query.overlaps('conditions', conditionArray)
+      }
+    }
+
     // Tri
     if (sort === 'recent') query = query.order('created_at', { ascending: false })
     else if (sort === 'price_asc') query = query.order('price_min', { ascending: true })
@@ -46,20 +57,35 @@ exports.getListings = async (req, res) => {
     const offset = (parseInt(page) - 1) * parseInt(limit)
     query = query.range(offset, offset + parseInt(limit) - 1)
 
-    const { data, error, count } = await query
+    const { data, error } = await query
     if (error) throw error
 
-    // Filtrage par distance côté JS (si coordonnées fournies)
+    // Filtrage par distance côté JS
     let listings = data || []
-    if (lat && lon && distance) {
-      const userLat = parseFloat(lat)
-      const userLon = parseFloat(lon)
-      const maxDist = parseFloat(distance)
-      listings = listings.filter(l => {
-        if (!l.latitude || !l.longitude) return true
-        const d = distanceKm(userLat, userLon, l.latitude, l.longitude)
-        return d <= Math.min(maxDist, l.max_distance_km)
-      })
+    if (distance) {
+      // Si lat/lon absents mais utilisateur connecté → utiliser son profil
+      if ((!lat || !lon) && req.user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('latitude, longitude')
+          .eq('id', req.user.id)
+          .single()
+        if (profile?.latitude && profile?.longitude) {
+          lat = profile.latitude
+          lon = profile.longitude
+        }
+      }
+
+      if (lat && lon) {
+        const userLat = parseFloat(lat)
+        const userLon = parseFloat(lon)
+        const maxDist = parseFloat(distance)
+        listings = listings.filter(l => {
+          if (!l.latitude || !l.longitude) return true
+          const d = distanceKm(userLat, userLon, l.latitude, l.longitude)
+          return d <= Math.min(maxDist, l.max_distance_km)
+        })
+      }
     }
 
     res.json({ data: listings, page: parseInt(page), limit: parseInt(limit) })
@@ -352,6 +378,10 @@ exports.uploadImages = async (req, res) => {
     const { id } = req.params
     const { images } = req.body // tableau de { base64, filename }
 
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ error: 'Aucune image fournie' })
+    }
+
     // Vérifier propriétaire
     const { data: listing } = await supabase
       .from('listings')
@@ -363,33 +393,69 @@ exports.uploadImages = async (req, res) => {
       return res.status(403).json({ error: 'Non autorisé' })
     }
 
+    // Récupérer le sort_order actuel max
+    const { data: existingImgs } = await supabase
+      .from('listing_images')
+      .select('sort_order')
+      .eq('listing_id', id)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+    const startOrder = (existingImgs?.[0]?.sort_order ?? -1) + 1
+
     const uploaded = []
+    const errors = []
+
     for (let i = 0; i < images.length; i++) {
       const { base64, filename } = images[i]
       const buffer = Buffer.from(base64, 'base64')
-      const path = `listings/${id}/${uuidv4()}-${filename}`
+
+      // Détecter le type MIME depuis le header base64 ou le nom de fichier
+      const ext = (filename || '').split('.').pop().toLowerCase()
+      const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }
+      const contentType = mimeMap[ext] || 'image/jpeg'
+
+      const storagePath = `listings/${id}/${uuidv4()}-${filename}`
 
       const { error: uploadError } = await supabase.storage
         .from('wantit-images')
-        .upload(path, buffer, { contentType: 'image/jpeg', upsert: false })
+        .upload(storagePath, buffer, { contentType, upsert: false })
 
-      if (uploadError) continue
+      if (uploadError) {
+        console.error(`[uploadImages] Storage error for ${filename}:`, uploadError.message)
+        errors.push({ filename, error: uploadError.message })
+        continue
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('wantit-images')
-        .getPublicUrl(path)
+        .getPublicUrl(storagePath)
 
-      const { data: img } = await supabase
+      const { data: img, error: dbError } = await supabase
         .from('listing_images')
-        .insert({ listing_id: id, url: publicUrl, sort_order: i })
+        .insert({ listing_id: id, url: publicUrl, sort_order: startOrder + i })
         .select()
         .single()
+
+      if (dbError) {
+        console.error(`[uploadImages] DB insert error:`, dbError.message)
+        errors.push({ filename, error: dbError.message })
+        continue
+      }
 
       uploaded.push(img)
     }
 
-    res.json({ images: uploaded })
+    if (uploaded.length === 0 && errors.length > 0) {
+      console.error('[uploadImages] All uploads failed:', errors)
+      return res.status(500).json({
+        error: 'Échec de l\'upload. Vérifiez que le bucket "wantit-images" existe dans Supabase Storage.',
+        details: process.env.NODE_ENV !== 'production' ? errors : undefined
+      })
+    }
+
+    res.json({ images: uploaded, errors: errors.length > 0 ? errors : undefined })
   } catch (err) {
+    console.error('[uploadImages] exception:', err)
     res.status(500).json({ error: 'Erreur lors de l\'upload' })
   }
 }

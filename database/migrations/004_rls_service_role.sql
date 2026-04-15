@@ -50,12 +50,22 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
 GRANT USAGE ON SCHEMA public TO service_role;
 
 -- ────────────────────────────────────────────────────────────
--- 4. Vérification
+-- 4. Corriger la politique reviews_write_own
+--    (FOR ALL sans WITH CHECK peut bloquer les INSERT)
+-- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "reviews_write_own" ON reviews;
+
+CREATE POLICY "reviews_write_own" ON reviews
+  FOR ALL USING (auth.uid() = reviewer_id)
+  WITH CHECK (auth.uid() = reviewer_id);
+
+-- ────────────────────────────────────────────────────────────
+-- 5. Vérification
 -- ────────────────────────────────────────────────────────────
 DO $$
 BEGIN
-  RAISE NOTICE '✅ Migration 004 : politiques RLS listing_brands créées';
-  RAISE NOTICE '   - lecture publique OK';
-  RAISE NOTICE '   - écriture par propriétaire OK';
-  RAISE NOTICE '   - service_role bypass confirmé';
+  RAISE NOTICE '✅ Migration 004 : politiques RLS corrigées';
+  RAISE NOTICE '   - listing_brands : lecture publique + écriture propriétaire OK';
+  RAISE NOTICE '   - reviews : WITH CHECK ajouté';
+  RAISE NOTICE '   - service_role bypass confirmé sur toutes les tables';
 END $$;

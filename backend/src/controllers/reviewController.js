@@ -40,12 +40,18 @@ exports.createReview = async (req, res) => {
         reviewer_id: req.user.id,
         reviewed_id,
         rating,
-        comment
+        comment: comment || null
       })
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('[createReview] insert error:', JSON.stringify(error))
+      return res.status(500).json({
+        error: 'Erreur lors de la publication de l\'avis',
+        details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+      })
+    }
 
     // Marquer la transaction
     if (isBuyer) {

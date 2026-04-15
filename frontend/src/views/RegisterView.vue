@@ -14,12 +14,21 @@
             </svg>
           </div>
           <h2 class="text-2xl font-bold text-gray-900">Vérifiez vos emails !</h2>
-          <p class="text-gray-600">Un lien de confirmation a été envoyé à <span class="font-semibold text-gray-900">{{ form.email }}</span>.</p>
-          <p class="text-sm text-gray-500">Veuillez cliquer sur le lien pour activer votre compte avant de vous connecter.</p>
-          <div class="pt-6">
-            <RouterLink to="/login" class="btn-primary inline-flex items-center gap-2">
+          <p class="text-gray-600">Un lien de confirmation a été envoyé à<br><span class="font-semibold text-gray-900">{{ form.email }}</span></p>
+          <p class="text-sm text-gray-500">Cliquez sur le lien dans l'email pour activer votre compte.</p>
+          <div class="pt-4 flex flex-col gap-3">
+            <RouterLink to="/login" class="btn-primary inline-flex items-center justify-center gap-2">
               Aller à la page de connexion
             </RouterLink>
+            <button
+              type="button"
+              class="text-sm text-gray-500 hover:text-primary-600 transition"
+              :disabled="resendLoading"
+              @click="resendConfirmation"
+            >
+              {{ resendLoading ? 'Envoi...' : 'Renvoyer l\'email de confirmation' }}
+            </button>
+            <p v-if="resendMsg" class="text-xs text-green-600">{{ resendMsg }}</p>
           </div>
         </div>
 
@@ -162,10 +171,12 @@ const form = ref({
   username: '', email: '', password: '', confirm: '',
   city: '', postal_code: '', region: '', latitude: null, longitude: null
 })
-const loading = ref(false)
-const error   = ref('')
-const showPwd = ref(false)
-const success = ref(false)
+const loading      = ref(false)
+const error        = ref('')
+const showPwd      = ref(false)
+const success      = ref(false)
+const resendLoading = ref(false)
+const resendMsg     = ref('')
 
 // Recherche de ville
 const citySearch = ref('')
@@ -218,17 +229,28 @@ async function handleRegister() {
   loading.value = true
   try {
     const data = await auth.register(form.value)
-    // Si une session est retournée (mode dev, email auto-confirmé) → redirection directe
     if (data?.session) {
       router.push('/')
     } else {
-      // Mode production : attendre confirmation par mail
       success.value = true
     }
   } catch (err) {
     error.value = err.response?.data?.error || 'Une erreur est survenue'
   } finally {
     loading.value = false
+  }
+}
+
+async function resendConfirmation() {
+  resendLoading.value = true
+  resendMsg.value     = ''
+  try {
+    await import('@/services/api').then(m => m.default.post('/api/auth/resend-confirmation', { email: form.value.email }))
+    resendMsg.value = 'Email renvoyé ! Vérifiez votre boîte mail.'
+  } catch {
+    resendMsg.value = 'Erreur lors de l\'envoi. Réessayez.'
+  } finally {
+    resendLoading.value = false
   }
 }
 </script>
