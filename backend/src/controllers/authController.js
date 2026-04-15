@@ -111,8 +111,20 @@ exports.register = async (req, res) => {
       }
     }
 
-    // Si on attend une confirmation par mail, on ne retourne pas de session
-    // (L'utilisateur ne pourra pas se connecter tant que le mail n'est pas validé)
+    // En dev (email auto-confirmé) → connecter directement l'utilisateur
+    if (isDev) {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (!signInError && signInData?.session) {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', authData.user.id).single()
+        return res.status(201).json({
+          message: 'Inscription réussie',
+          session: signInData.session,
+          profile
+        })
+      }
+    }
+
+    // En production : attendre confirmation par mail
     res.status(201).json({
       message: 'Inscription réussie. Veuillez vérifier votre boîte mail pour confirmer votre compte.',
       user: { id: authData.user.id, email, username }

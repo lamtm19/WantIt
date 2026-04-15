@@ -176,7 +176,7 @@ exports.createListing = async (req, res) => {
       return res.status(400).json({ error: 'Votre annonce contient des mots non autorisés' })
     }
 
-    if (price_min > price_max) {
+    if (parseFloat(price_min) > parseFloat(price_max)) {
       return res.status(400).json({ error: 'Le prix minimum doit être inférieur au prix maximum' })
     }
 
@@ -187,42 +187,65 @@ exports.createListing = async (req, res) => {
       .eq('id', req.user.id)
       .single()
 
+    // Construire l'objet à insérer (category_id null si absent)
+    const insertData = {
+      user_id:         req.user.id,
+      category_id:     category_id || null,
+      title,
+      description:     description || null,
+      price_min:       parseFloat(price_min),
+      price_max:       parseFloat(price_max),
+      max_distance_km: parseInt(max_distance_km),
+      conditions:      Array.isArray(conditions) ? conditions : [],
+      is_urgent:       is_urgent || false,
+      city:            profile?.city    || null,
+      postal_code:     profile?.postal_code || null,
+      region:          profile?.region  || null,
+      latitude:        profile?.latitude  || null,
+      longitude:       profile?.longitude || null
+    }
+
     const { data: listing, error } = await supabase
       .from('listings')
-      .insert({
-        user_id: req.user.id,
-        category_id,
-        title,
-        description,
-        price_min: parseFloat(price_min),
-        price_max: parseFloat(price_max),
-        max_distance_km: parseInt(max_distance_km),
-        conditions,
-        is_urgent: is_urgent || false,
-        city: profile?.city,
-        postal_code: profile?.postal_code,
-        region: profile?.region,
-        latitude: profile?.latitude,
-        longitude: profile?.longitude
-      })
+      .insert(insertData)
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('[createListing] Supabase error:', JSON.stringify(error))
+      return res.status(500).json({
+        error: 'Erreur lors de la création de l\'annonce',
+        details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+      })
+    }
 
     // Ajouter les marques
     if (brands && brands.length > 0) {
-      const brandInserts = brands.map(b => ({
-        listing_id: listing.id,
-        brand_id: b.id || null,
-        brand_name: b.name || null
-      }))
-      await supabase.from('listing_brands').insert(brandInserts)
+      // Dédupliquer par nom pour éviter la contrainte unique
+      const seen = new Set()
+      const brandInserts = brands
+        .filter(b => {
+          const key = b.id ? `id:${b.id}` : `name:${(b.name || '').toLowerCase()}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        .map(b => ({
+          listing_id: listing.id,
+          brand_id:   b.id   || null,
+          brand_name: b.name || null
+        }))
+
+      const { error: brandError } = await supabase.from('listing_brands').insert(brandInserts)
+      if (brandError) {
+        console.warn('[createListing] brand insert warning:', brandError.message)
+        // Non bloquant : l'annonce est créée
+      }
     }
 
     res.status(201).json(listing)
   } catch (err) {
-    console.error(err)
+    console.error('[createListing] exception:', err)
     res.status(500).json({ error: 'Erreur lors de la création de l\'annonce' })
   }
 }

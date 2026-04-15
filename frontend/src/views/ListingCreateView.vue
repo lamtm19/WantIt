@@ -278,7 +278,13 @@ async function handleSubmit() {
     toast.success('Recherche publiée avec succès !')
     router.push(`/listings/${listing.id}`)
   } catch (err) {
-    error.value = err.response?.data?.error || 'Erreur lors de la publication'
+    const data = err.response?.data
+    if (data?.errors?.length) {
+      error.value = data.errors.map(e => e.msg).join(', ')
+    } else {
+      error.value = data?.error || 'Erreur lors de la publication'
+    }
+    if (data?.details) console.error('Listing create details:', data.details)
   } finally {
     loading.value = false
   }

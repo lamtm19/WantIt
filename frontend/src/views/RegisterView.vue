@@ -217,9 +217,14 @@ async function handleRegister() {
   error.value   = ''
   loading.value = true
   try {
-    await auth.register(form.value)
-    success.value = true
-    // On ne redirige pas tout de suite si on attend une confirmation par mail
+    const data = await auth.register(form.value)
+    // Si une session est retournée (mode dev, email auto-confirmé) → redirection directe
+    if (data?.session) {
+      router.push('/')
+    } else {
+      // Mode production : attendre confirmation par mail
+      success.value = true
+    }
   } catch (err) {
     error.value = err.response?.data?.error || 'Une erreur est survenue'
   } finally {

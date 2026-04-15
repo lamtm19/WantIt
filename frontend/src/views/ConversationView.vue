@@ -233,7 +233,7 @@ import {
 import { useToast } from 'vue-toastification'
 import { useAuthStore } from '@/stores/auth'
 import { useConversationStore } from '@/stores/conversations'
-import { getSocket, joinConversation, leaveConversation, sendSocketMessage, emitTypingStart, emitTypingStop, markMessagesRead } from '@/services/socket'
+import { getSocket, joinConversation, leaveConversation, emitTypingStart, emitTypingStop, markMessagesRead } from '@/services/socket'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import api from '@/services/api'
@@ -377,11 +377,24 @@ function stopTyping() {
   emitTypingStop(convId)
 }
 
-function sendText() {
-  if (!messageText.value.trim()) return
-  sendSocketMessage({ conversation_id: convId, type: 'text', content: messageText.value.trim() })
+async function sendText() {
+  const text = messageText.value.trim()
+  if (!text) return
   messageText.value = ''
   stopTyping()
+  try {
+    const msg = await convStore.sendMessage(convId, { type: 'text', content: text })
+    // Ajouter localement (le socket va aussi émettre pour l'autre personne)
+    const exists = messages.value.find(m => m.id === msg.id)
+    if (!exists) {
+      messages.value.push(msg)
+      nextTick(scrollToBottom)
+    }
+  } catch {
+    // Restaurer le texte si envoi échoué
+    messageText.value = text
+    toast.error('Erreur lors de l\'envoi du message')
+  }
 }
 
 async function sendOffer() {
