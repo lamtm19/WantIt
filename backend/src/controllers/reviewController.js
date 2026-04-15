@@ -1,0 +1,108 @@
+const supabase     = require('../config/supabase')
+const emailService = require('../services/emailService')
+
+exports.createReview = async (req, res) => {
+  try {
+    const { transaction_id, rating, comment } = req.body
+
+    // Vérifier que la transaction existe et que l'utilisateur en fait partie
+    const { data: tx } = await supabase
+      .from('transactions')
+      .select('*, listings:listing_id(title)')
+      .eq('id', transaction_id)
+      .single()
+
+    if (!tx) return res.status(404).json({ error: 'Transaction introuvable' })
+
+    const isBuyer  = tx.buyer_id  === req.user.id
+    const isSeller = tx.seller_id === req.user.id
+
+    if (!isBuyer && !isSeller) {
+      return res.status(403).json({ error: 'Non autorisé' })
+    }
+
+    // Vérifier qu'il n'a pas déjà laissé un avis
+    const { data: existingReview } = await supabase
+      .from('reviews')
+      .select('id')
+      .eq('transaction_id', transaction_id)
+      .eq('reviewer_id', req.user.id)
+      .single()
+
+    if (existingReview) return res.status(400).json({ error: 'Vous avez déjà laissé un avis pour cette transaction' })
+
+    const reviewed_id = isBuyer ? tx.seller_id : tx.buyer_id
+
+    const { data: review, error } = await supabase
+      .from('reviews')
+      .insert({
+        transaction_id,
+        reviewer_id: req.user.id,
+        reviewed_id,
+        rating,
+        comment
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    // Marquer la transaction
+    if (isBuyer) {
+      await supabase.from('transactions').update({ buyer_reviewed: true }).eq('id', transaction_id)
+    } else {
+      await supabase.from('transactions').update({ seller_reviewed: true }).eq('id', transaction_id)
+    }
+
+    // Notification email
+    const { data: reviewedAuth } = await supabase.auth.admin.getUserById(reviewed_id)
+    const { data: reviewedProfile } = await supabase.from('profiles').select('username').eq('id', reviewed_id).single()
+
+    if (reviewedAuth?.user?.email) {
+      await emailService.sendNewReviewEmail(
+        reviewedAuth.user.email,
+        reviewedProfile?.username,
+        req.user.username,
+        rating,
+        tx.listings?.title
+      )
+    }
+
+    res.status(201).json(review)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erreur interne' })
+  }
+}
+
+exports.updateReview = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { rating, comment } = req.body
+
+    const { data: existing } = await supabase
+      .from('reviews')
+      .select('reviewer_id')
+      .eq('id', id)
+      .single()
+
+    if (!existing) return res.status(404).json({ error: 'Avis introuvable' })
+    if (existing.reviewer_id !== req.user.id) return res.status(403).json({ error: 'Non autorisé' })
+
+    const updates = {}
+    if (rating !== undefined) updates.rating = rating
+    if (comment !== undefined) updates.comment = comment
+
+    const { data, error } = await supabase
+      .from('reviews')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur interne' })
+  }
+}
