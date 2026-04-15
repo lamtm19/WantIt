@@ -77,6 +77,11 @@ const routes = [
     component: () => import('@/views/LegalView.vue'),
     meta: { title: 'Mentions légales' }
   },
+  {
+    path: '/confirm-email',
+    component: () => import('@/views/ConfirmEmailView.vue'),
+    meta: { title: 'Confirmation email' }
+  },
   // Admin
   {
     path: '/admin',

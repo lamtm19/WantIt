@@ -55,4 +55,6 @@ router.delete('/account', requireAuth, ctrl.deleteAccount)
 
 router.get('/me', requireAuth, ctrl.getMe)
 
+router.post('/confirm-email', ctrl.confirmEmail)
+
 module.exports = router

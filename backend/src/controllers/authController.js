@@ -4,6 +4,15 @@ exports.register = async (req, res) => {
   try {
     const { email, password, username, city, postal_code, region, latitude, longitude } = req.body
 
+    // Validations de base
+    if (!email || !password || !username) {
+      return res.status(400).json({ error: 'Veuillez remplir tous les champs obligatoires' })
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Le mot de passe doit faire au moins 8 caractères' })
+    }
+
     // Vérifier unicité du pseudo
     const { data: existingUser } = await supabase
       .from('profiles')
@@ -16,17 +25,34 @@ exports.register = async (req, res) => {
     }
 
     // Créer le compte Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // On utilise signUp pour déclencher l'envoi du mail de confirmation
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      email_confirm: true
+      options: {
+        data: { username, city, postal_code, region, latitude, longitude }
+      }
     })
 
     if (authError) {
+      if (authError.message.includes('rate limit') || authError.message.includes('rate-limit')) {
+        return res.status(429).json({ error: 'Trop de tentatives. Attendez 60s et réessayez.' })
+      }
       return res.status(400).json({ error: authError.message })
     }
 
-    // Créer le profil
+    if (!authData.user) {
+      return res.status(500).json({ error: 'Une erreur est survenue lors de la création du compte' })
+    }
+
+    // Vérifier que l'utilisateur existe (timing Supabase)
+    await new Promise(resolve => setTimeout(resolve, 500))
+    const { data: userCheck } = await supabase.auth.admin.getUserById(authData.user.id)
+    if (!userCheck.user) {
+      return res.status(500).json({ error: 'Utilisateur non créé (retry)' })
+    }
+
+    // Créer le profil (id maintenant garanti)
     const { error: profileError } = await supabase.from('profiles').insert({
       id: authData.user.id,
       username,
@@ -38,20 +64,22 @@ exports.register = async (req, res) => {
     })
 
     if (profileError) {
-      // Rollback : supprimer l'utilisateur Auth
+      console.error('Profile insert error:', profileError)
+      try {
+        // Rollback sûr
+        await supabase.from('profiles').delete().eq('id', authData.user.id)
+      } catch (delErr) {
+        console.error('Cleanup failed:', delErr)
+      }
       await supabase.auth.admin.deleteUser(authData.user.id)
-      return res.status(500).json({ error: 'Erreur lors de la création du profil' })
+      return res.status(500).json({ error: 'Erreur profil : ' + profileError.message + '. Réessayez.' })
     }
 
-    // Connexion automatique après inscription
-    const { data: session, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-    if (signInError) {
-      return res.status(500).json({ error: 'Compte créé, veuillez vous connecter' })
-    }
-
+    // Si on attend une confirmation par mail, on ne retourne pas de session
+    // (L'utilisateur ne pourra pas se connecter tant que le mail n'est pas validé)
     res.status(201).json({
-      user: { id: authData.user.id, email, username },
-      session: session.session
+      message: 'Inscription réussie. Veuillez vérifier votre boîte mail pour confirmer votre compte.',
+      user: { id: authData.user.id, email, username }
     })
   } catch (err) {
     console.error('register error:', err)
@@ -157,5 +185,42 @@ exports.getMe = async (req, res) => {
     res.json(profile)
   } catch (err) {
     res.status(500).json({ error: 'Erreur interne' })
+  }
+}
+
+exports.confirmEmail = async (req, res) => {
+  try {
+    const { token_hash, type = 'signup' } = req.body
+
+    if (!token_hash) {
+      return res.status(400).json({ error: 'Token requis' })
+    }
+
+    // Vérifier le token avec Supabase (magic link confirmation)
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash,
+      type
+    })
+
+    if (error) {
+      console.error('Token verification error:', error)
+      return res.status(400).json({ error: 'Token invalide ou expiré. Veuillez demander un nouveau lien.' })
+    }
+
+    // Récupérer le profil pour réponse
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username, email')
+      .eq('id', data.user.id)
+      .single()
+
+    res.json({
+      success: true,
+      message: 'Email confirmé avec succès!',
+      user: profile
+    })
+  } catch (err) {
+    console.error('confirmEmail error:', err)
+    res.status(500).json({ error: 'Erreur interne du serveur' })
   }
 }

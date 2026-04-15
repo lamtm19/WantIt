@@ -1,19 +1,13 @@
-const { Resend } = require('resend')
+// Service d'email (Simulé ou via Supabase SMTP à configurer)
+// Nous n'utilisons plus Resend directement car Supabase gère l'auth.
+// Pour les mails transactionnels (messages, offres), vous pouvez configurer un SMTP dans Supabase.
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM   = process.env.EMAIL_FROM || 'WantIt <noreply@wantit.app>'
-const BASE   = process.env.FRONTEND_URL || 'http://localhost:5173'
+const BASE = process.env.FRONTEND_URL || 'http://localhost:5173'
 
 async function send(to, subject, html) {
-  if (!process.env.RESEND_API_KEY) {
-    console.log(`[Email simulé] À: ${to} | Sujet: ${subject}`)
-    return
-  }
-  try {
-    await resend.emails.send({ from: FROM, to, subject, html })
-  } catch (err) {
-    console.error('Email error:', err)
-  }
+  // Par défaut on logge en console. 
+  // À terme, utilisez Supabase Edge Functions ou un service SMTP tiers.
+  console.log(`[EMAIL NOTIF] À: ${to} | Sujet: ${subject}`)
 }
 
 function baseTemplate(content) {
