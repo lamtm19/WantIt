@@ -45,6 +45,21 @@ function baseTemplate(content) {
 </html>`
 }
 
+exports.sendConfirmationEmail = async (to, username, confirmationLink) => {
+  await send(
+    to,
+    '✅ Confirmez votre compte WantIt',
+    baseTemplate(`
+      <h2>Bienvenue sur WantIt, ${username} !</h2>
+      <p>Cliquez sur le bouton ci-dessous pour confirmer votre adresse email et activer votre compte.</p>
+      <a class="btn" href="${confirmationLink}">Confirmer mon compte</a>
+      <p style="font-size:12px;color:#999;margin-top:16px;">
+        Ce lien expire dans 24h. Si vous n'avez pas créé de compte, ignorez cet email.
+      </p>
+    `)
+  )
+}
+
 exports.sendNewMessageEmail = async (to, recipientName, senderName, listingTitle, conversationId) => {
   await send(
     to,

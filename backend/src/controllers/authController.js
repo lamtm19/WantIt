@@ -24,26 +24,49 @@ exports.register = async (req, res) => {
       return res.status(400).json({ error: 'Ce pseudo est déjà utilisé' })
     }
 
-    // Créer le compte Supabase Auth
-    // On utilise signUp pour déclencher l'envoi du mail de confirmation
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // En développement (NODE_ENV != production) : auto-confirmer le compte
+    // → pas d'email, connexion immédiate possible
+    // En production : email_confirm: false → envoi du lien de confirmation
+    const isDev = process.env.NODE_ENV !== 'production'
+
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: { username, city, postal_code, region, latitude, longitude },
-        emailRedirectTo: `${process.env.FRONTEND_URL}/confirm-email`
-      }
+      email_confirm: isDev, // true en dev (pas de confirmation), false en prod
+      user_metadata: { username, city, postal_code, region, latitude, longitude }
     })
 
     if (authError) {
-      if (authError.message.includes('rate limit') || authError.message.includes('rate-limit')) {
-        return res.status(429).json({ error: 'Trop de tentatives. Attendez 60s et réessayez.' })
+      const msg = authError.message.toLowerCase()
+      if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('duplicate')) {
+        return res.status(400).json({ error: 'Un compte existe déjà avec cet email' })
       }
-      return res.status(400).json({ error: authError.message })
+      console.error('admin.createUser error:', authError)
+      return res.status(400).json({ error: 'Erreur lors de la création du compte : ' + authError.message })
     }
 
-    if (!authData.user) {
+    if (!authData?.user) {
       return res.status(500).json({ error: 'Une erreur est survenue lors de la création du compte' })
+    }
+
+    // En production : générer et envoyer le lien de confirmation
+    if (!isDev) {
+      try {
+        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+          type: 'signup',
+          email,
+          options: { redirectTo: `${process.env.FRONTEND_URL}/confirm-email` }
+        })
+        if (linkData?.properties?.action_link) {
+          console.log(`[CONFIRMATION LINK] ${email} → ${linkData.properties.action_link}`)
+          await emailService.sendConfirmationEmail(email, username, linkData.properties.action_link)
+        } else {
+          console.warn('generateLink error:', linkError)
+        }
+      } catch (linkErr) {
+        console.error('generateLink exception:', linkErr)
+        // Non bloquant : le compte est créé
+      }
     }
 
     // Créer le profil via la fonction SECURITY DEFINER (contourne les RLS)
@@ -125,7 +148,7 @@ exports.login = async (req, res) => {
   }
 }
 
-exports.logout = async (req, res) => {
+exports.logout = async (_req, res) => {
   res.json({ message: 'Déconnecté' })
 }
 

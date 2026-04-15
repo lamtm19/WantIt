@@ -43,11 +43,13 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 
-// Rate limiting global
+// Rate limiting global (désactivé en développement local)
+const isDev = process.env.NODE_ENV !== 'production'
 app.use(rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
-  max: 200,
-  message: { error: 'Trop de requêtes, réessayez plus tard.' }
+  windowMs: 15 * 60 * 1000,
+  max: isDev ? 5000 : 300,
+  message: { error: 'Trop de requêtes, réessayez plus tard.' },
+  skip: (req) => isDev && (req.ip === '::1' || req.ip === '127.0.0.1')
 }))
 
 // ── Routes ───────────────────────────────────────────────────
