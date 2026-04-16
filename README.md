@@ -261,10 +261,11 @@ wantit/
 │   │   │   ├── auth.js
 │   │   │   ├── listings.js
 │   │   │   ├── conversations.js
+│   │   │   ├── messages.js
 │   │   │   ├── users.js
 │   │   │   ├── reviews.js
 │   │   │   ├── categories.js
-│   │   │   └── brands.js
+│   │   │   └── brands.js         # Autocomplétion de marques (liste statique)
 │   │   ├── controllers/
 │   │   │   ├── authController.js
 │   │   │   ├── listingController.js
@@ -285,15 +286,21 @@ wantit/
 │   │   │   ├── ListingCreateView.vue
 │   │   │   ├── ListingEditView.vue
 │   │   │   ├── ListingDetailView.vue
+│   │   │   ├── MyListingsView.vue
 │   │   │   ├── ConversationView.vue
 │   │   │   ├── MessagesView.vue
 │   │   │   ├── ProfileView.vue
+│   │   │   ├── ProfileSettingsView.vue
+│   │   │   ├── PublicProfileView.vue
 │   │   │   ├── LoginView.vue
 │   │   │   ├── RegisterView.vue
+│   │   │   ├── ForgotPasswordView.vue
 │   │   │   ├── ResetPasswordView.vue
-│   │   │   └── ConfirmEmailView.vue
+│   │   │   ├── ConfirmEmailView.vue
+│   │   │   ├── LegalView.vue
+│   │   │   └── NotFoundView.vue
 │   │   ├── components/
-│   │   │   ├── common/           # Navbar, Footer, UserAvatar, ListingCard
+│   │   │   ├── common/           # Navbar, Footer, UserAvatar, ListingCard, StarRating
 │   │   │   ├── listings/         # ListingFilters
 │   │   │   └── chat/             # MessageBubble
 │   │   ├── stores/
