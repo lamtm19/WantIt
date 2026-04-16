@@ -226,6 +226,9 @@ exports.sendMessage = async (req, res) => {
     // Émettre le message via socket pour la mise à jour en temps réel
     if (_io) {
       _io.to(`conv:${id}`).emit('new:message', msg)
+      // Fallback : envoyer aussi dans la room personnelle du destinataire
+      // (toujours rejointe à la connexion, sans dépendre du join:conversation)
+      _io.to(`user:${recipientId}`).emit('new:message', msg)
       // Notification badge au destinataire (s'il n'est pas dans la conversation)
       _io.to(`user:${recipientId}`).emit('notification:message', {
         conversation_id: id,

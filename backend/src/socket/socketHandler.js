@@ -87,8 +87,12 @@ module.exports = function (io) {
           // Émettre à tous les membres de la conversation
           io.to(`conv:${conversation_id}`).emit('new:message', msg)
 
-          // Émettre une notification push au destinataire s'il n'est pas dans la room
           const recipientId = userId === conv.buyer_id ? conv.seller_id : conv.buyer_id
+
+          // Fallback : envoyer aussi dans la room personnelle du destinataire
+          io.to(`user:${recipientId}`).emit('new:message', msg)
+
+          // Émettre une notification push au destinataire s'il n'est pas dans la room
           const recipientSocketIds = userSockets.get(recipientId)
 
           if (recipientSocketIds) {
