@@ -43,12 +43,12 @@
         <div class="flex gap-3 items-center">
           <div class="flex-1">
             <label class="label">Min (€) <span class="text-red-500">*</span></label>
-            <input v-model.number="form.price_min" type="number" class="input" placeholder="0" required min="0" />
+            <input v-model.number="form.price_min" type="number" class="input" placeholder="0" required min="0" @wheel.prevent="$event.target.blur()" />
           </div>
           <span class="text-gray-400 mt-5">–</span>
           <div class="flex-1">
             <label class="label">Max (€) <span class="text-red-500">*</span></label>
-            <input v-model.number="form.price_max" type="number" class="input" placeholder="100" required min="0" />
+            <input v-model.number="form.price_max" type="number" class="input" placeholder="100" required min="0" @wheel.prevent="$event.target.blur()" />
           </div>
         </div>
         <p v-if="form.price_min > form.price_max && form.price_max" class="text-xs text-red-500 mt-2">Le min doit être inférieur au max</p>
@@ -108,7 +108,7 @@
           <label class="label">Distance maximale <span class="text-red-500">*</span></label>
           <p class="text-xs text-gray-500 mb-2">Je suis prêt à faire maximum ... km pour venir chercher ce bien</p>
           <div class="relative max-w-[200px]">
-            <input v-model.number="form.max_distance_km" type="number" class="input pr-12" placeholder="50" required min="1" />
+            <input v-model.number="form.max_distance_km" type="number" class="input pr-12" placeholder="50" required min="1" @wheel.prevent="$event.target.blur()" />
             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">km</span>
           </div>
         </div>

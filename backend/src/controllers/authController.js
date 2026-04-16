@@ -90,9 +90,9 @@ exports.register = async (req, res) => {
         options: { redirectTo: `${process.env.FRONTEND_URL}/confirm-email` }
       })
 
-      if (linkData?.properties?.action_link) {
-        const link = linkData.properties.action_link
-        // En dev, afficher le lien dans le terminal pour tester sans email réel
+      if (linkData?.properties?.hashed_token) {
+        // Lien direct avec token_hash pour éviter le problème PKCE (même approche que reset password)
+        const link = `${process.env.FRONTEND_URL}/confirm-email?token_hash=${linkData.properties.hashed_token}&type=signup`
         if (process.env.NODE_ENV !== 'production') {
           console.log('\n========== LIEN DE CONFIRMATION (DEV) ==========')
           console.log(`Email : ${email}`)
@@ -252,20 +252,36 @@ exports.deleteAccount = async (req, res) => {
   try {
     const userId = req.user.id
 
+    // 1. Supprimer les transactions où l'utilisateur est acheteur ou vendeur
+    //    (transactions.buyer_id et seller_id n'ont pas ON DELETE CASCADE)
+    //    Les reviews associées cascadent automatiquement via transaction_id FK CASCADE
+    const { error: txError } = await supabase
+      .from('transactions')
+      .delete()
+      .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+    if (txError) console.error('deleteAccount - transactions error:', txError)
+
+    // 2. Supprimer le profil — le reste cascade automatiquement :
+    //    listings → listing_images, listing_brands, conversations → messages
+    //    conversations via buyer_id/seller_id → conversations → messages
     const { error: profileDelError } = await supabase
       .from('profiles').delete().eq('id', userId)
-    if (profileDelError) console.error('deleteAccount - profile error:', profileDelError)
+    if (profileDelError) {
+      console.error('deleteAccount - profile error:', profileDelError)
+      return res.status(500).json({ error: 'Erreur lors de la suppression du profil', details: profileDelError.message })
+    }
 
+    // 3. Supprimer le compte auth Supabase
     const { error: authDelError } = await supabase.auth.admin.deleteUser(userId)
     if (authDelError) {
       console.error('deleteAccount - auth error:', authDelError)
-      return res.status(500).json({ error: 'Erreur lors de la suppression du compte' })
+      return res.status(500).json({ error: 'Erreur lors de la suppression du compte', details: authDelError.message })
     }
 
     res.json({ message: 'Compte supprimé définitivement' })
   } catch (err) {
     console.error('deleteAccount error:', err)
-    res.status(500).json({ error: 'Erreur lors de la suppression du compte' })
+    res.status(500).json({ error: 'Erreur lors de la suppression du compte', details: err.message })
   }
 }
 
@@ -331,7 +347,7 @@ exports.resendConfirmation = async (req, res) => {
     const user = users?.users?.find(u => u.email === email)
     const username = user?.user_metadata?.username || 'utilisateur'
 
-    const link = linkData.properties.action_link
+    const link = `${process.env.FRONTEND_URL}/confirm-email?token_hash=${linkData.properties.hashed_token}&type=signup`
     if (process.env.NODE_ENV !== 'production') {
       console.log('\n========== LIEN DE CONFIRMATION (DEV) ==========')
       console.log(`Email : ${email}`)
