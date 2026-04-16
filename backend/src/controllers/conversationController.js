@@ -141,7 +141,8 @@ exports.createConversation = async (req, res) => {
 exports.getMessages = async (req, res) => {
   try {
     const { id } = req.params
-    const { before, limit = 50 } = req.query
+    const { before } = req.query
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100)
 
     // Vérifier accès
     const { data: conv } = await supabase
@@ -159,7 +160,7 @@ exports.getMessages = async (req, res) => {
       .select(`*, sender:sender_id (id, username, avatar_url)`)
       .eq('conversation_id', id)
       .order('created_at', { ascending: false })
-      .limit(parseInt(limit))
+      .limit(limit)
 
     if (before) query = query.lt('created_at', before)
 

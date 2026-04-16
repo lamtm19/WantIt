@@ -30,8 +30,8 @@ router.post('/:id/messages',
   requireAuth,
   [
     body('type').isIn(['text', 'image', 'offer', 'counter_offer']),
-    body('content').optional().trim(),
-    body('offer_amount').optional().isFloat({ min: 0 })
+    body('content').optional().trim().isLength({ max: 5000 }),
+    body('offer_amount').optional().isFloat({ min: 0.01, max: 999999 })
   ],
   validate,
   ctrl.sendMessage
