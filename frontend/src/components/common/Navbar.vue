@@ -1,25 +1,30 @@
 <template>
-  <header class="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16 gap-4">
+  <header
+    :class="[
+      'sticky top-3 z-50 px-4 sm:px-6 lg:px-8 transition-transform duration-300',
+      isNavVisible ? 'translate-y-0' : '-translate-y-[140%]',
+    ]"
+  >
+    <div class="max-w-7xl mx-auto panel-soft">
+      <div class="flex items-center justify-between h-14 gap-3 px-4 sm:px-5">
 
         <!-- Logo -->
         <RouterLink to="/" class="flex items-center gap-2 shrink-0">
-          <span class="text-2xl font-black text-primary-600">WantIt</span>
+          <span class="text-[1.7rem] font-extrabold tracking-[-0.05em] text-primary-700">WantIt</span>
         </RouterLink>
 
         <!-- Barre de recherche (desktop) -->
-        <div class="hidden md:flex flex-1 max-w-lg">
+        <div class="hidden md:flex flex-1 max-w-md">
           <div class="relative w-full">
             <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               v-model="searchQuery"
               type="search"
               placeholder="Rechercher un besoin..."
-              class="input pl-10 py-2"
-              @keyup.enter="handleSearch"
-            />
-          </div>
+            class="input pl-10 py-2.5 bg-white/80"
+            @keyup.enter="handleSearch"
+          />
+        </div>
         </div>
 
         <!-- Actions -->
@@ -38,7 +43,7 @@
           <RouterLink
             v-if="auth.isAuthenticated"
             to="/messages"
-            class="relative p-2 rounded-xl hover:bg-gray-100 transition"
+            class="relative p-2 rounded-full hover:bg-white/80 transition"
           >
             <MessageSquare class="w-5 h-5 text-gray-600" />
             <span
@@ -53,7 +58,7 @@
           <div v-if="auth.isAuthenticated" class="relative" ref="menuRef">
             <button
               @click="menuOpen = !menuOpen"
-              class="flex items-center gap-2 p-1.5 rounded-xl hover:bg-gray-100 transition"
+              class="flex items-center gap-2 p-1.5 rounded-full hover:bg-white/80 transition"
             >
               <UserAvatar :profile="auth.profile" size="sm" />
               <ChevronDown class="w-4 h-4 text-gray-500" />
@@ -62,9 +67,9 @@
             <Transition name="slide-up">
               <div
                 v-if="menuOpen"
-                class="absolute right-0 top-12 w-56 bg-white rounded-2xl shadow-lg border border-gray-100 py-1 z-50"
+                class="absolute right-0 top-12 w-56 bg-white/95 rounded-[1.75rem] shadow-lg py-1 z-50 backdrop-blur-xl"
               >
-                <div class="px-4 py-2 border-b border-gray-50">
+                <div class="px-4 py-2 border-b border-black/5">
                   <p class="font-semibold text-sm text-gray-900">{{ auth.profile?.username }}</p>
                   <p class="text-xs text-gray-500">{{ auth.profile?.city || auth.profile?.region }}</p>
                 </div>
@@ -98,14 +103,14 @@
     </div>
 
     <!-- Barre de recherche mobile -->
-    <div class="md:hidden px-4 pb-3">
+    <div class="md:hidden px-4 pb-2.5">
       <div class="relative">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
         <input
           v-model="searchQuery"
           type="search"
           placeholder="Rechercher..."
-          class="input pl-10 py-2"
+          class="input pl-10 py-2.5 bg-white/80"
           @keyup.enter="handleSearch"
         />
       </div>
@@ -114,7 +119,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 import {
@@ -132,8 +137,34 @@ const router    = useRouter()
 const menuOpen   = ref(false)
 const menuRef    = ref(null)
 const searchQuery = ref('')
+const isNavVisible = ref(true)
+
+let lastScrollY = 0
 
 onClickOutside(menuRef, () => { menuOpen.value = false })
+
+function handleScroll() {
+  const currentScrollY = window.scrollY
+
+  if (currentScrollY <= 24) {
+    isNavVisible.value = true
+  } else if (currentScrollY > lastScrollY) {
+    isNavVisible.value = false
+  } else {
+    isNavVisible.value = true
+  }
+
+  lastScrollY = currentScrollY
+}
+
+onMounted(() => {
+  lastScrollY = window.scrollY
+  window.addEventListener('scroll', handleScroll, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 
 function handleSearch() {
   if (searchQuery.value.trim()) {
@@ -149,6 +180,6 @@ async function handleLogout() {
 
 <style scoped>
 .menu-item {
-  @apply flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition cursor-pointer;
+  @apply flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100/70 transition cursor-pointer;
 }
 </style>

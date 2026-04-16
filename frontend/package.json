@@ -2,6 +2,7 @@
   "name": "wantit-frontend",
   "version": "1.0.0",
   "description": "WantIt - Frontend Vue.js",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

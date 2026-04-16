@@ -1,7 +1,8 @@
 <template>
   <div class="min-h-screen flex flex-col">
     <Navbar />
-    <main class="flex-1">
+    <main class="flex-1 relative">
+      <div class="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-white/50 to-transparent" />
       <RouterView v-slot="{ Component }">
         <Transition name="fade" mode="out-in">
           <component :is="Component" />

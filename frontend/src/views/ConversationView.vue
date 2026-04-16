@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-3xl mx-auto flex flex-col h-[calc(100vh-4rem)]" v-if="conv">
+  <div class="max-w-3xl mx-auto mt-4 flex flex-col h-[calc(100vh-5rem)]" v-if="conv">
     <!-- Header -->
     <div class="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 shrink-0">
       <RouterLink to="/messages" class="text-gray-500 hover:text-gray-700">

@@ -1,103 +1,102 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+  <div class="auth-page min-h-screen flex items-center justify-center p-4 bg-gray-50">
     <div class="w-full max-w-lg">
       <div class="text-center mb-8">
-        <RouterLink to="/" class="text-3xl font-black text-primary-600">WantIt</RouterLink>
-        <p class="text-gray-500 mt-2">Créez votre compte gratuitement</p>
+        <RouterLink to="/" class="text-4xl font-black tracking-[-0.05em] text-primary-700">WantIt</RouterLink>
+        <p class="mt-2 text-gray-700 font-medium">Créez votre compte gratuitement</p>
       </div>
 
-      <div class="card p-8">
+      <div class="card auth-card p-8">
         <div v-if="success" class="text-center space-y-4 py-8 animate-in zoom-in duration-300">
-          <div class="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div class="w-20 h-20 bg-green-100 text-green-700 rounded-full flex items-center justify-center mx-auto mb-6">
             <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg>
           </div>
           <h2 class="text-2xl font-bold text-gray-900">Vérifiez vos emails !</h2>
-          <p class="text-gray-600">Un lien de confirmation a été envoyé à<br><span class="font-semibold text-gray-900">{{ form.email }}</span></p>
-          <p class="text-sm text-gray-500">Cliquez sur le lien dans l'email pour activer votre compte.</p>
+          <p class="text-gray-700">Un lien de confirmation a été envoyé à<br><span class="font-semibold text-gray-900">{{ form.email }}</span></p>
+          <p class="text-sm text-gray-700">Cliquez sur le lien dans l'email pour activer votre compte.</p>
           <div class="pt-4 flex flex-col gap-3">
             <RouterLink to="/login" class="btn-primary inline-flex items-center justify-center gap-2">
               Aller à la page de connexion
             </RouterLink>
             <button
               type="button"
-              class="text-sm text-gray-500 hover:text-primary-600 transition"
+              class="text-sm text-gray-700 hover:text-primary-700 transition"
               :disabled="resendLoading"
               @click="resendConfirmation"
             >
               {{ resendLoading ? 'Envoi...' : 'Renvoyer l\'email de confirmation' }}
             </button>
-            <p v-if="resendMsg" class="text-xs text-green-600">{{ resendMsg }}</p>
+            <p v-if="resendMsg" class="text-xs text-green-700">{{ resendMsg }}</p>
           </div>
         </div>
 
         <form v-else @submit.prevent="handleRegister" class="space-y-4">
-          <!-- Pseudo -->
           <div>
-            <label class="label">Pseudo <span class="text-red-500">*</span></label>
-            <input v-model="form.username" type="text" class="input" placeholder="MonPseudo" required minlength="3" maxlength="30" autocomplete="username" />
+            <label class="label auth-label">Pseudo <span class="text-red-600">*</span></label>
+            <input v-model="form.username" type="text" class="input auth-input" placeholder="MonPseudo" required minlength="3" maxlength="30" autocomplete="username" />
           </div>
 
-          <!-- Email -->
           <div>
-            <label class="label">Email <span class="text-red-500">*</span></label>
-            <input v-model="form.email" type="email" class="input" placeholder="vous@exemple.com" required autocomplete="email" />
+            <label class="label auth-label">Email <span class="text-red-600">*</span></label>
+            <input v-model="form.email" type="email" class="input auth-input" placeholder="vous@exemple.com" required autocomplete="email" />
           </div>
 
-          <!-- Mot de passe -->
           <div>
-            <label class="label">Mot de passe <span class="text-red-500">*</span></label>
+            <label class="label auth-label">Mot de passe <span class="text-red-600">*</span></label>
             <div class="relative">
               <input
                 v-model="form.password"
                 :type="showPwd ? 'text' : 'password'"
-                class="input pr-12"
+                class="input auth-input pr-12"
                 placeholder="Minimum 8 caractères"
                 required
                 minlength="8"
                 autocomplete="new-password"
               />
-              <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" @click="showPwd = !showPwd">
+              <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" @click="showPwd = !showPwd">
                 <Eye v-if="!showPwd" class="w-5 h-5" /><EyeOff v-else class="w-5 h-5" />
               </button>
             </div>
             <div class="mt-1 flex gap-1">
-              <div v-for="i in 4" :key="i" :class="[
-                'h-1 flex-1 rounded-full transition-colors',
-                form.password.length >= i * 2 ? (form.password.length < 8 ? 'bg-orange-400' : 'bg-green-500') : 'bg-gray-200'
-              ]"></div>
+              <div
+                v-for="i in 4"
+                :key="i"
+                :class="[
+                  'h-1 flex-1 rounded-full transition-colors',
+                  form.password.length >= i * 2 ? (form.password.length < 8 ? 'bg-orange-500' : 'bg-green-600') : 'bg-gray-300',
+                ]"
+              ></div>
             </div>
-            <p v-if="form.password && form.password.length < 8" class="text-xs text-orange-600 mt-1 flex items-center gap-1">
-              <span class="w-1 h-1 bg-orange-600 rounded-full"></span>
+            <p v-if="form.password && form.password.length < 8" class="text-xs text-orange-700 mt-1 flex items-center gap-1">
+              <span class="w-1 h-1 bg-orange-700 rounded-full"></span>
               Minimum 8 caractères requis
             </p>
           </div>
 
-          <!-- Confirmation -->
           <div>
-            <label class="label">Confirmer le mot de passe <span class="text-red-500">*</span></label>
+            <label class="label auth-label">Confirmer le mot de passe <span class="text-red-600">*</span></label>
             <input
               v-model="form.confirm"
               :type="showPwd ? 'text' : 'password'"
-              class="input"
+              class="input auth-input"
               placeholder="••••••••"
               required
               autocomplete="new-password"
             />
-            <p v-if="form.confirm && form.password !== form.confirm" class="text-xs text-red-500 mt-1">Les mots de passe ne correspondent pas</p>
+            <p v-if="form.confirm && form.password !== form.confirm" class="text-xs text-red-600 mt-1">Les mots de passe ne correspondent pas</p>
           </div>
 
-          <!-- Localisation -->
-          <div class="pt-2 border-t border-gray-100">
-            <p class="text-sm font-semibold text-gray-700 mb-3">Votre localisation</p>
+          <div class="pt-2 border-t border-gray-200">
+            <p class="text-sm font-semibold text-gray-800 mb-3">Votre localisation</p>
             <div class="relative">
-              <label class="label">Rechercher une ville <span class="text-red-500">*</span></label>
+              <label class="label auth-label">Rechercher une ville <span class="text-red-600">*</span></label>
               <input
                 v-model="citySearch"
                 @input="searchCities"
                 type="text"
-                class="input"
+                class="input auth-input"
                 placeholder="Ex: Paris, Lyon..."
                 autocomplete="off"
               />
@@ -107,31 +106,31 @@
                   :key="city.code"
                   type="button"
                   @click="selectCity(city)"
-                  class="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm border-b border-gray-50 last:border-0"
+                  class="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm border-b border-gray-100 last:border-0"
                 >
                   <div class="font-medium text-gray-900">{{ city.nom }}</div>
-                  <div class="text-xs text-gray-500">{{ city.codesPostaux[0] }} - {{ city.region.nom }}</div>
+                  <div class="text-xs text-gray-600">{{ city.codesPostaux[0] }} - {{ city.region.nom }}</div>
                 </button>
               </div>
             </div>
 
             <div v-if="form.city" class="mt-4 p-4 bg-primary-50 rounded-xl border border-primary-100 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-primary-600">
+                <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-primary-700">
                   <MapPin class="w-5 h-5" />
                 </div>
                 <div>
                   <div class="text-sm font-bold text-primary-900">{{ form.city }} ({{ form.postal_code }})</div>
-                  <div class="text-xs text-primary-600">{{ form.region }}</div>
+                  <div class="text-xs text-primary-700">{{ form.region }}</div>
                 </div>
               </div>
-              <button @click="clearCity" type="button" class="p-1 hover:bg-white rounded-full text-primary-400 transition-colors">
+              <button @click="clearCity" type="button" class="p-1 hover:bg-white rounded-full text-primary-500 transition-colors">
                 <X class="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          <p v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded-xl">{{ error }}</p>
+          <p v-if="error" class="text-sm text-red-700 bg-red-50 p-3 rounded-xl">{{ error }}</p>
 
           <button
             type="submit"
@@ -142,15 +141,15 @@
             <span v-else>Créer mon compte</span>
           </button>
 
-          <p class="text-xs text-gray-400 text-center">
+          <p class="text-xs text-gray-700 text-center">
             En vous inscrivant, vous acceptez les
-            <RouterLink to="/legal" class="text-primary-600 hover:underline">mentions légales</RouterLink>.
+            <RouterLink to="/legal" class="text-primary-700 font-medium hover:underline">mentions légales</RouterLink>.
           </p>
         </form>
 
-        <p class="text-center text-sm text-gray-500 mt-6">
+        <p class="text-center text-sm text-gray-700 mt-6">
           Déjà un compte ?
-          <RouterLink to="/login" class="text-primary-600 font-semibold hover:underline">Se connecter</RouterLink>
+          <RouterLink to="/login" class="text-primary-700 font-semibold hover:underline">Se connecter</RouterLink>
         </p>
       </div>
     </div>
@@ -158,27 +157,26 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Eye, EyeOff, Loader, MapPin, X } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import axios from 'axios'
 
-const auth   = useAuthStore()
+const auth = useAuthStore()
 const router = useRouter()
 
 const form = ref({
   username: '', email: '', password: '', confirm: '',
-  city: '', postal_code: '', region: '', latitude: null, longitude: null
+  city: '', postal_code: '', region: '', latitude: null, longitude: null,
 })
-const loading      = ref(false)
-const error        = ref('')
-const showPwd      = ref(false)
-const success      = ref(false)
+const loading = ref(false)
+const error = ref('')
+const showPwd = ref(false)
+const success = ref(false)
 const resendLoading = ref(false)
-const resendMsg     = ref('')
+const resendMsg = ref('')
 
-// Recherche de ville
 const citySearch = ref('')
 const cities = ref([])
 let searchTimeout = null
@@ -188,7 +186,7 @@ async function searchCities() {
     cities.value = []
     return
   }
-  
+
   clearTimeout(searchTimeout)
   searchTimeout = setTimeout(async () => {
     try {
@@ -225,7 +223,7 @@ async function handleRegister() {
     return
   }
 
-  error.value   = ''
+  error.value = ''
   loading.value = true
   try {
     const data = await auth.register(form.value)
@@ -243,9 +241,9 @@ async function handleRegister() {
 
 async function resendConfirmation() {
   resendLoading.value = true
-  resendMsg.value     = ''
+  resendMsg.value = ''
   try {
-    await import('@/services/api').then(m => m.default.post('/api/auth/resend-confirmation', { email: form.value.email }))
+    await import('@/services/api').then((m) => m.default.post('/api/auth/resend-confirmation', { email: form.value.email }))
     resendMsg.value = 'Email renvoyé ! Vérifiez votre boîte mail.'
   } catch {
     resendMsg.value = 'Erreur lors de l\'envoi. Réessayez.'
