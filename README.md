@@ -370,4 +370,4 @@ wantit/
 
 ---
 
-*Projet fil rouge — EFREI Paris, B2 — 2024/2025*
+*Projet fil rouge de l'équipe F11
