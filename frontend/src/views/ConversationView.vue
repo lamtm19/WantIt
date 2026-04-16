@@ -32,9 +32,6 @@
             <RouterLink :to="`/users/${otherUser?.id}`" class="menu-item" @click="showMenu = false">
               <User class="w-4 h-4" /> Voir le profil
             </RouterLink>
-            <button @click="reportConv" class="menu-item w-full text-red-500">
-              <Flag class="w-4 h-4" /> Signaler
-            </button>
           </div>
         </Transition>
       </div>
@@ -46,11 +43,14 @@
     </div>
 
     <!-- Bannière avis disponible -->
-    <div v-if="transaction" class="bg-green-50 px-4 py-2.5 border-b border-green-100 shrink-0 flex items-center justify-between gap-3">
+    <div v-if="transaction && !hasReviewed" class="bg-green-50 px-4 py-2.5 border-b border-green-100 shrink-0 flex items-center justify-between gap-3">
       <p class="text-sm text-green-800 font-medium">✅ Transaction validée — laissez un avis !</p>
       <button @click="showReviewModal = true" class="btn-primary btn-sm shrink-0">
         ⭐ Laisser un avis
       </button>
+    </div>
+    <div v-else-if="transaction && hasReviewed" class="bg-green-50 px-4 py-2.5 border-b border-green-100 shrink-0 text-center">
+      <p class="text-sm text-green-700">✅ Transaction validée — avis déjà publié</p>
     </div>
 
     <!-- Messages -->
@@ -77,14 +77,14 @@
     </div>
 
     <!-- Bouton "Transaction réalisée" -->
-    <div v-if="isBuyer && conv.listings?.status === 'active' && !transaction" class="bg-white border-t border-gray-100 px-4 py-2 shrink-0">
+    <div v-if="isBuyer && !transaction" class="bg-white border-t border-gray-100 px-4 py-2 shrink-0">
       <button @click="showValidateModal = true" class="btn-primary w-full btn-sm">
         ✅ Valider la transaction
       </button>
     </div>
 
     <!-- Zone de saisie -->
-    <div v-if="conv.listings?.status === 'active'" class="bg-white border-t border-gray-100 p-3 shrink-0">
+    <div class="bg-white border-t border-gray-100 p-3 shrink-0">
       <!-- Proposer un prix (acheteur ET vendeur) -->
       <div class="mb-2">
         <button
@@ -227,7 +227,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 import {
-  ArrowLeft, MoreVertical, Package, User, Flag, Tag,
+  ArrowLeft, MoreVertical, Package, User, Tag,
   Image as ImageIcon, Send, Loader
 } from 'lucide-vue-next'
 import { useToast } from 'vue-toastification'
@@ -266,6 +266,7 @@ const validating       = ref(false)
 const reviewRating     = ref(0)
 const reviewComment    = ref('')
 const reviewSending    = ref(false)
+const hasReviewed      = ref(false)
 
 onClickOutside(menuRef, () => { showMenu.value = false })
 
@@ -300,6 +301,12 @@ onMounted(async () => {
     try {
       const txRes = await api.get(`/api/conversations/${convId}/transaction`)
       transaction.value = txRes.data
+      // Vérifier si l'utilisateur a déjà laissé un avis
+      if (txRes.data) {
+        const tx = txRes.data
+        if (isBuyer.value && tx.buyer_reviewed) hasReviewed.value = true
+        if (isSeller.value && tx.seller_reviewed) hasReviewed.value = true
+      }
     } catch {}
 
     // Écouter les nouveaux messages
@@ -516,27 +523,22 @@ async function submitReview() {
   try {
     await api.post('/api/reviews', {
       transaction_id: transaction.value.id,
-      rating: reviewRating.value,
+      rating: Number(reviewRating.value),
       comment: reviewComment.value || null
     })
     showReviewModal.value = false
+    hasReviewed.value = true
     reviewRating.value = 0
     reviewComment.value = ''
     toast.success('Avis publié ! Merci pour votre retour.')
   } catch (err) {
-    toast.error(err.response?.data?.error || 'Erreur lors de la publication de l\'avis')
+    const detail = err.response?.data?.details || err.response?.data?.error || 'Erreur lors de la publication de l\'avis'
+    toast.error(detail)
   } finally {
     reviewSending.value = false
   }
 }
 
-async function reportConv() {
-  showMenu.value = false
-  try {
-    await api.post(`/api/conversations/${convId}/report`, { reason: 'Contenu inapproprié' })
-    toast.success('Conversation signalée')
-  } catch {}
-}
 </script>
 
 <style scoped>

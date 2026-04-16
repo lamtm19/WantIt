@@ -57,7 +57,7 @@
 
     <div v-else class="text-center py-20">
       <Package class="w-12 h-12 text-gray-300 mx-auto mb-3" />
-      <p class="text-gray-500">Aucune annonce {{ tabLabel }}</p>
+      <p class="text-gray-500">Aucune annonce {{ tabLabel[activeTab] }}</p>
       <RouterLink v-if="activeTab === 'active'" to="/listings/create" class="btn-primary mt-4 inline-flex">
         Publier ma première recherche
       </RouterLink>
@@ -132,6 +132,10 @@ async function confirmDelete() {
   try {
     await store.deleteListing(toDelete.value.id)
     await load()
+    // Mettre à jour le compteur de l'onglet actif
+    if (counts.value[activeTab.value] > 0) {
+      counts.value = { ...counts.value, [activeTab.value]: counts.value[activeTab.value] - 1 }
+    }
     toast.success('Annonce supprimée')
   } catch { toast.error('Erreur lors de la suppression') }
 }

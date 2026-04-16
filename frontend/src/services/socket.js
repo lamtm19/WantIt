@@ -2,9 +2,17 @@ import { io } from 'socket.io-client'
 import { useAuthStore } from '@/stores/auth'
 
 let socket = null
+// Callbacks à appeler à chaque connexion/reconnexion
+const onConnectCallbacks = new Set()
 
 export function getSocket() {
   return socket
+}
+
+export function onSocketConnect(cb) {
+  onConnectCallbacks.add(cb)
+  // Si déjà connecté, appeler immédiatement
+  if (socket?.connected) cb(socket)
 }
 
 export function connectSocket() {
@@ -18,7 +26,11 @@ export function connectSocket() {
     reconnectionDelayMax: 5000
   })
 
-  socket.on('connect', () => console.log('Socket connecté'))
+  socket.on('connect', () => {
+    console.log('Socket connecté')
+    // Notifier tous les abonnés (permet de re-enregistrer les listeners après reconnexion)
+    onConnectCallbacks.forEach(cb => cb(socket))
+  })
   socket.on('disconnect', () => console.log('Socket déconnecté'))
   socket.on('connect_error', (err) => console.error('Socket error:', err.message))
 

@@ -13,28 +13,43 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useConversationStore } from '@/stores/conversations'
-import { getSocket } from '@/services/socket'
+import { onSocketConnect } from '@/services/socket'
 import Navbar from '@/components/common/Navbar.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
 
 const auth  = useAuthStore()
 const convStore = useConversationStore()
 
+// Enregistrer une seule fois un callback qui s'exécute à chaque (re)connexion socket
+// Cela garantit que le listener survit aux reconnexions
+onSocketConnect((socket) => {
+  // Refetch au (re)connect pour rattraper les notifications manquées pendant la déco
+  if (auth.isAuthenticated) convStore.fetchUnreadCount()
+
+  socket.off('notification:message')
+  socket.on('notification:message', () => {
+    convStore.fetchUnreadCount()
+  })
+})
+
+async function initForAuthUser() {
+  await auth.refreshProfile()
+  await convStore.fetchUnreadCount()
+}
+
 onMounted(async () => {
   if (auth.isAuthenticated) {
-    await auth.refreshProfile()
-    await convStore.fetchUnreadCount()
+    await initForAuthUser()
+  }
+})
 
-    // Écouter les notifications socket
-    const socket = getSocket()
-    if (socket) {
-      socket.on('notification:message', () => {
-        convStore.fetchUnreadCount()
-      })
-    }
+// Recharger le compteur après login
+watch(() => auth.isAuthenticated, async (authenticated) => {
+  if (authenticated) {
+    await initForAuthUser()
   }
 })
 </script>

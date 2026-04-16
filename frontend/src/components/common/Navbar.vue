@@ -79,12 +79,6 @@
                   <Settings class="w-4 h-4" /> Paramètres
                 </RouterLink>
 
-                <div v-if="auth.isAdmin" class="border-t border-gray-50 mt-1">
-                  <RouterLink to="/admin" class="menu-item text-primary-600" @click="menuOpen = false">
-                    <Shield class="w-4 h-4" /> Administration
-                  </RouterLink>
-                </div>
-
                 <div class="border-t border-gray-50 mt-1">
                   <button @click="handleLogout" class="menu-item w-full text-red-500">
                     <LogOut class="w-4 h-4" /> Déconnexion
@@ -125,7 +119,7 @@ import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 import {
   Search, Plus, MessageSquare, User, List, Settings,
-  Shield, LogOut, ChevronDown
+  LogOut, ChevronDown
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useConversationStore } from '@/stores/conversations'

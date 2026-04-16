@@ -131,66 +131,7 @@ exports.getUserReviews = async (req, res) => {
   }
 }
 
-exports.blockUser = async (req, res) => {
-  try {
-    const { id } = req.params
-    if (id === req.user.id) return res.status(400).json({ error: 'Vous ne pouvez pas vous bloquer vous-même' })
-
-    await supabase.from('blocked_users').upsert({
-      blocker_id: req.user.id,
-      blocked_id: id
-    })
-
-    res.json({ message: 'Utilisateur bloqué' })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
-  }
-}
-
-exports.unblockUser = async (req, res) => {
-  try {
-    const { id } = req.params
-    await supabase.from('blocked_users')
-      .delete()
-      .eq('blocker_id', req.user.id)
-      .eq('blocked_id', id)
-
-    res.json({ message: 'Utilisateur débloqué' })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
-  }
-}
-
-exports.getBlockedUsers = async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('blocked_users')
-      .select('blocked:blocked_id (id, username, avatar_url), created_at')
-      .eq('blocker_id', req.user.id)
-
-    if (error) throw error
-    res.json({ data: data || [] })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
-  }
-}
-
-exports.reportUser = async (req, res) => {
-  try {
-    const { id } = req.params
-    const { reason } = req.body
-
-    if (!reason) return res.status(400).json({ error: 'Raison requise' })
-
-    await supabase.from('reports').insert({
-      reporter_id: req.user.id,
-      type: 'user',
-      target_id: id,
-      reason
-    })
-
-    res.json({ message: 'Utilisateur signalé' })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
-  }
-}
+exports.blockUser   = (_req, res) => res.status(501).json({ error: 'Fonctionnalité non disponible' })
+exports.unblockUser = (_req, res) => res.status(501).json({ error: 'Fonctionnalité non disponible' })
+exports.getBlockedUsers = (_req, res) => res.json({ data: [] })
+exports.reportUser  = (_req, res) => res.status(501).json({ error: 'Fonctionnalité non disponible' })

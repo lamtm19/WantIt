@@ -43,12 +43,19 @@ const success  = ref(false)
 
 async function handleSubmit() {
   if (password.value !== confirm.value) return
+
+  const token_hash = route.query.token_hash
+  if (!token_hash) {
+    error.value = 'Lien invalide. Veuillez redemander un email de réinitialisation.'
+    return
+  }
+
   loading.value = true
   error.value   = ''
   try {
     await api.post('/api/auth/reset-password', {
       password: password.value,
-      access_token: route.hash.replace('#access_token=', '').split('&')[0]
+      token_hash
     })
     success.value = true
   } catch (err) {

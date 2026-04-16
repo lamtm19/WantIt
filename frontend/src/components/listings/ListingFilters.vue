@@ -2,13 +2,10 @@
   <div class="card p-4 space-y-4">
     <h3 class="font-bold text-gray-900">Filtres</h3>
 
-    <!-- Catégorie -->
+    <!-- Marque -->
     <div>
-      <label class="label">Catégorie</label>
-      <select v-model="local.category_id" class="input">
-        <option value="">Toutes les catégories</option>
-        <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
-      </select>
+      <label class="label">Marque</label>
+      <input v-model="local.brand" type="text" placeholder="Ex: Nike, Apple..." class="input" />
     </div>
 
     <!-- Prix -->
@@ -32,15 +29,6 @@
       </div>
     </div>
 
-    <!-- Distance -->
-    <div>
-      <label class="label">Distance max</label>
-      <div class="relative">
-        <input v-model="local.distance" type="number" placeholder="km" class="input pr-12" min="1" />
-        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">km</span>
-      </div>
-    </div>
-
     <!-- Urgent -->
     <label class="flex items-center gap-3 cursor-pointer">
       <input type="checkbox" v-model="local.is_urgent" class="rounded text-primary-600 focus:ring-primary-500 w-4 h-4" />
@@ -56,13 +44,9 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue'
-import { useListingStore } from '@/stores/listings'
+import { reactive } from 'vue'
 
 const emit = defineEmits(['filter'])
-
-const store = useListingStore()
-const categories = store.categories
 
 const CONDITIONS = [
   { value: 'new_with_tags',    label: 'Neuf avec étiquette' },
@@ -73,30 +57,25 @@ const CONDITIONS = [
 ]
 
 const local = reactive({
-  category_id: '',
+  brand: '',
   min_price: '',
   max_price: '',
   conditions: [],
-  distance: '',
   is_urgent: false
 })
 
 function applyFilters() {
   const filters = {}
-  if (local.category_id) filters.category_id = local.category_id
-  if (local.min_price)   filters.min_price   = local.min_price
-  if (local.max_price)   filters.max_price   = local.max_price
+  if (local.brand)            filters.brand     = local.brand
+  if (local.min_price)        filters.min_price = local.min_price
+  if (local.max_price)        filters.max_price = local.max_price
   if (local.conditions.length) filters.condition = local.conditions.join(',')
-  if (local.distance)    filters.distance    = local.distance
-  if (local.is_urgent)   filters.is_urgent   = 'true'
+  if (local.is_urgent)        filters.is_urgent = 'true'
   emit('filter', filters)
 }
 
 function resetFilters() {
-  Object.assign(local, {
-    category_id: '', min_price: '', max_price: '',
-    conditions: [], distance: '', is_urgent: false
-  })
+  Object.assign(local, { brand: '', min_price: '', max_price: '', conditions: [], is_urgent: false })
   emit('filter', {})
 }
 </script>

@@ -82,23 +82,6 @@ const routes = [
     component: () => import('@/views/ConfirmEmailView.vue'),
     meta: { title: 'Confirmation email' }
   },
-  // Admin
-  {
-    path: '/admin',
-    component: () => import('@/views/admin/AdminLayout.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true },
-    children: [
-      { path: '',          redirect: '/admin/dashboard' },
-      { path: 'dashboard', component: () => import('@/views/admin/AdminDashboard.vue'), meta: { title: 'Dashboard Admin' } },
-      { path: 'users',     component: () => import('@/views/admin/AdminUsers.vue'),     meta: { title: 'Utilisateurs' } },
-      { path: 'listings',  component: () => import('@/views/admin/AdminListings.vue'),  meta: { title: 'Annonces' } },
-      { path: 'reports',   component: () => import('@/views/admin/AdminReports.vue'),   meta: { title: 'Signalements' } },
-      { path: 'categories',component: () => import('@/views/admin/AdminCategories.vue'),meta: { title: 'Catégories' } },
-      { path: 'brands',    component: () => import('@/views/admin/AdminBrands.vue'),    meta: { title: 'Marques' } },
-      { path: 'words',     component: () => import('@/views/admin/AdminWords.vue'),     meta: { title: 'Mots interdits' } },
-      { path: 'conversations', component: () => import('@/views/admin/AdminConversations.vue'), meta: { title: 'Conversations signalées' } }
-    ]
-  },
   {
     path: '/:pathMatch(.*)*',
     component: () => import('@/views/NotFoundView.vue'),
@@ -126,10 +109,6 @@ router.beforeEach((to, from, next) => {
   }
 
   if (to.meta.guestOnly && auth.isAuthenticated) {
-    return next('/')
-  }
-
-  if (to.meta.requiresAdmin && !auth.isAdmin) {
     return next('/')
   }
 

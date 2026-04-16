@@ -136,12 +136,6 @@
           </div>
         </div>
 
-        <!-- Signaler -->
-        <div v-if="auth.isAuthenticated && !isOwner" class="text-center">
-          <button @click="showReportModal = true" class="text-xs text-gray-400 hover:text-red-500 transition">
-            <Flag class="w-3 h-3 inline mr-1" /> Signaler cette annonce
-          </button>
-        </div>
 
         <!-- Stats -->
         <div class="card p-4 text-sm text-gray-500 space-y-1">
@@ -198,21 +192,6 @@
       </Transition>
     </Teleport>
 
-    <!-- Modal signalement -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div v-if="showReportModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="showReportModal = false">
-          <div class="card p-6 w-full max-w-md">
-            <h3 class="font-bold text-lg mb-4">Signaler cette annonce</h3>
-            <textarea v-model="reportReason" class="input resize-none mb-4" rows="3" placeholder="Décrivez le problème..." />
-            <div class="flex gap-3">
-              <button class="btn-secondary flex-1" @click="showReportModal = false">Annuler</button>
-              <button class="btn-danger flex-1" :disabled="!reportReason.trim()" @click="sendReport">Signaler</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
 
     <!-- Modal changement de statut -->
     <Teleport to="body">
@@ -301,7 +280,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ImageOff, MapPin, Navigation, Zap, MessageSquare, Pencil, Flag, Loader, Image as ImageIcon } from 'lucide-vue-next'
+import { ImageOff, MapPin, Navigation, Zap, MessageSquare, Pencil, Loader, Image as ImageIcon } from 'lucide-vue-next'
 import { useToast } from 'vue-toastification'
 import { useAuthStore } from '@/stores/auth'
 import { useListingStore } from '@/stores/listings'
@@ -320,18 +299,16 @@ const listing          = ref(null)
 const loading          = ref(true)
 const activeImg        = ref(0)
 const showContactModal = ref(false)
-const showReportModal  = ref(false)
 const showStatusModal  = ref(false)
 const showDeleteConfirm = ref(false)
 const contactMessage   = ref('')
 const contactLoading   = ref(false)
 const contactImages    = ref([]) // [{ file, preview, base64 }]
-const reportReason     = ref('')
 const statusLoading    = ref(false)
 
 const isOwner = computed(() => listing.value?.user_id === auth.profile?.id)
 const images  = computed(() => (listing.value?.listing_images || []).sort((a, b) => a.sort_order - b.sort_order))
-const brands  = computed(() => (listing.value?.listing_brands || []).map(b => b.brands?.name || b.brand_name).filter(Boolean))
+const brands  = computed(() => (listing.value?.listing_brands || []).map(b => b.brand_name).filter(Boolean))
 
 const locationLabel = computed(() => {
   if (!listing.value) return ''
@@ -461,13 +438,4 @@ async function handleDelete() {
   }
 }
 
-async function sendReport() {
-  if (!reportReason.value.trim()) return
-  try {
-    await api.post('/api/reports/listing', { listing_id: listing.value.id, reason: reportReason.value })
-    showReportModal.value = false
-    reportReason.value = ''
-    toast.success('Annonce signalée')
-  } catch { toast.error('Erreur lors du signalement') }
-}
 </script>

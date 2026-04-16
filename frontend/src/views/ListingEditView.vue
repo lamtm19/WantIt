@@ -54,6 +54,33 @@
         </div>
       </div>
 
+      <!-- Marques -->
+      <div class="card p-5">
+        <h2 class="font-bold text-gray-900 mb-1">Marques (optionnel)</h2>
+        <p class="text-sm text-gray-500 mb-4">Saisissez les marques recherchées</p>
+        <div class="flex gap-2 mb-3">
+          <input v-model="brandSearch" type="text" class="input flex-1" placeholder="Tapez une marque..." @input="searchBrands" @keyup.enter="addBrandByText" />
+          <button type="button" class="btn-secondary" @click="addBrandByText">Ajouter</button>
+        </div>
+        <!-- Suggestions -->
+        <div v-if="brandSuggestions.length" class="flex flex-wrap gap-2 mb-3">
+          <button
+            v-for="b in brandSuggestions"
+            :key="b.id"
+            type="button"
+            class="badge badge-gray cursor-pointer hover:bg-gray-200"
+            @click="addBrand(b)"
+          >{{ b.name }}</button>
+        </div>
+        <!-- Marques sélectionnées -->
+        <div class="flex flex-wrap gap-2">
+          <span v-for="(b, i) in form.brands" :key="i" class="badge badge-green">
+            {{ b.name }}
+            <button type="button" @click="removeBrand(i)" class="ml-1 hover:text-green-900">✕</button>
+          </span>
+        </div>
+      </div>
+
       <!-- Distance -->
       <div class="card p-5">
         <h2 class="font-bold mb-4">Distance maximale</h2>
@@ -154,16 +181,19 @@ const router = useRouter()
 const store  = useListingStore()
 const toast  = useToast()
 
-const listing       = ref(null)
-const loading       = ref(false)
-const error         = ref('')
+const listing        = ref(null)
+const loading        = ref(false)
+const error          = ref('')
 const existingImages = ref([])   // images déjà dans la DB
 const imagesToDelete = ref([])   // images existantes à supprimer
 const newImages      = ref([])   // nouvelles images à uploader
+const brandSearch    = ref('')
+const brandSuggestions = ref([])
 
 const form = ref({
   title: '', description: '', category_id: '', price_min: 0,
-  price_max: 0, max_distance_km: 50, conditions: [], is_urgent: false, status: 'active'
+  price_max: 0, max_distance_km: 50, conditions: [], is_urgent: false, status: 'active',
+  brands: []
 })
 
 const CONDITIONS = [
@@ -188,12 +218,40 @@ onMounted(async () => {
     max_distance_km: listing.value.max_distance_km,
     conditions:      listing.value.conditions || [],
     is_urgent:       listing.value.is_urgent,
-    status:          listing.value.status
+    status:          listing.value.status,
+    brands:          (listing.value.listing_brands || []).map(lb => ({
+      name: lb.brand_name || ''
+    })).filter(b => b.name)
   })
   // Charger les images existantes (triées par sort_order)
   existingImages.value = [...(listing.value.listing_images || [])]
     .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 })
+
+let brandTimer = null
+async function searchBrands() {
+  clearTimeout(brandTimer)
+  if (brandSearch.value.length < 2) { brandSuggestions.value = []; return }
+  brandTimer = setTimeout(async () => {
+    const res = await api.get('/api/brands/search', { params: { q: brandSearch.value } })
+    brandSuggestions.value = res.data.data || []
+  }, 300)
+}
+
+function addBrand(brand) {
+  if (!form.value.brands.find(b => b.name === brand.name)) {
+    form.value.brands.push({ name: brand.name })
+  }
+  brandSearch.value = ''
+  brandSuggestions.value = []
+}
+
+function addBrandByText() {
+  if (!brandSearch.value.trim()) return
+  addBrand({ name: brandSearch.value.trim() })
+}
+
+function removeBrand(i) { form.value.brands.splice(i, 1) }
 
 function removeExistingImage(img) {
   existingImages.value = existingImages.value.filter(i => i.id !== img.id)
@@ -223,7 +281,7 @@ async function handleSubmit() {
   loading.value = true
   error.value   = ''
   try {
-    // 1. Mettre à jour les infos textuelles
+    // 1. Mettre à jour les infos textuelles + marques
     await store.updateListing(listing.value.id, {
       title:           form.value.title,
       description:     form.value.description || null,
@@ -232,7 +290,8 @@ async function handleSubmit() {
       price_max:       form.value.price_max,
       max_distance_km: form.value.max_distance_km,
       conditions:      form.value.conditions,
-      is_urgent:       form.value.is_urgent
+      is_urgent:       form.value.is_urgent,
+      brands:          form.value.brands
     })
 
     // 2. Changer le statut si modifié

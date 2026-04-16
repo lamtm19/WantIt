@@ -59,7 +59,5 @@ router.post('/:id/images',
   ctrl.uploadChatImage
 )
 
-// Signaler une conversation
-router.post('/:id/report', requireAuth, ctrl.reportConversation)
 
 module.exports = router

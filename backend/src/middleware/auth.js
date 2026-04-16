@@ -16,7 +16,7 @@ async function requireAuth(req, res, next) {
   // Vérifier que l'utilisateur n'est pas banni
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, username, is_admin, is_banned')
+    .select('id, username, is_banned')
     .eq('id', user.id)
     .single()
 
@@ -43,7 +43,7 @@ async function optionalAuth(req, res, next) {
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, username, is_admin, is_banned')
+      .select('id, username, is_banned')
       .eq('id', user.id)
       .single()
     if (profile && !profile.is_banned) {

@@ -82,16 +82,6 @@ exports.createConversation = async (req, res) => {
       return res.status(400).json({ error: 'Vous avez déjà une conversation pour cette annonce', conversation_id: existing.id })
     }
 
-    // Vérifier que l'utilisateur n'est pas bloqué
-    const { data: blocked } = await supabase
-      .from('blocked_users')
-      .select('blocker_id')
-      .eq('blocker_id', listing.user_id)
-      .eq('blocked_id', req.user.id)
-      .single()
-
-    if (blocked) return res.status(403).json({ error: 'Vous ne pouvez pas contacter cet utilisateur' })
-
     // Créer la conversation
     const { data: conv, error: convError } = await supabase
       .from('conversations')
@@ -205,10 +195,6 @@ exports.sendMessage = async (req, res) => {
       return res.status(403).json({ error: 'Non autorisé' })
     }
 
-    if (conv.listings?.status !== 'active') {
-      return res.status(400).json({ error: 'Cette annonce n\'est plus active' })
-    }
-
     // Les offres peuvent venir du vendeur OU de l'acheteur
     if (type === 'offer' && req.user.id !== conv.seller_id && req.user.id !== conv.buyer_id) {
       return res.status(403).json({ error: 'Non autorisé' })
@@ -235,13 +221,20 @@ exports.sendMessage = async (req, res) => {
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', id)
 
+    const recipientId = req.user.id === conv.buyer_id ? conv.seller_id : conv.buyer_id
+
     // Émettre le message via socket pour la mise à jour en temps réel
     if (_io) {
       _io.to(`conv:${id}`).emit('new:message', msg)
+      // Notification badge au destinataire (s'il n'est pas dans la conversation)
+      _io.to(`user:${recipientId}`).emit('notification:message', {
+        conversation_id: id,
+        sender_username: req.user.username,
+        preview: type === 'offer' ? `Offre: ${offer_amount}€` : content?.slice(0, 80)
+      })
     }
 
     // Notification email
-    const recipientId = req.user.id === conv.buyer_id ? conv.seller_id : conv.buyer_id
     const { data: recipientAuth } = await supabase.auth.admin.getUserById(recipientId)
     const { data: recipientProfile } = await supabase.from('profiles').select('username').eq('id', recipientId).single()
 
@@ -456,24 +449,6 @@ exports.validateTransaction = async (req, res) => {
   }
 }
 
-exports.reportConversation = async (req, res) => {
-  try {
-    const { id } = req.params
-    const { reason } = req.body
-
-    await supabase.from('conversations').update({ is_flagged: true }).eq('id', id)
-    await supabase.from('reports').insert({
-      reporter_id: req.user.id,
-      type: 'conversation',
-      target_id: id,
-      reason
-    })
-
-    res.json({ message: 'Conversation signalée' })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
-  }
-}
 
 exports.getTransaction = async (req, res) => {
   try {

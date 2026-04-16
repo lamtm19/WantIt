@@ -10,7 +10,6 @@ export const useAuthStore = defineStore('auth', () => {
   const token   = ref(localStorage.getItem('wantit_token') || null)
 
   const isAuthenticated = computed(() => !!token.value)
-  const isAdmin         = computed(() => profile.value?.is_admin || false)
 
   function setSession(data) {
     token.value   = data.session?.access_token || null
@@ -78,7 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user, profile, token,
-    isAuthenticated, isAdmin,
+    isAuthenticated,
     register, login, logout,
     refreshProfile, updateProfile, uploadAvatar
   }

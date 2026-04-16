@@ -30,6 +30,9 @@ module.exports = function (io) {
     if (!userSockets.has(userId)) userSockets.set(userId, new Set())
     userSockets.get(userId).add(socket.id)
 
+    // Rejoindre la room personnelle pour recevoir les notifications directes
+    socket.join(`user:${userId}`)
+
     // Rejoindre les rooms des conversations actives
     socket.on('join:conversation', async (conversationId) => {
       // Vérifier que l'utilisateur fait partie de la conversation
@@ -60,10 +63,6 @@ module.exports = function (io) {
           .single()
 
         if (!conv || (conv.buyer_id !== userId && conv.seller_id !== userId)) return
-        if (conv.listings?.status !== 'active') {
-          socket.emit('error:message', { message: 'Annonce non active' })
-          return
-        }
 
         const { data: msg } = await supabase
           .from('messages')

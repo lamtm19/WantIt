@@ -2,17 +2,16 @@ const supabase = require('../config/supabase')
 
 exports.getStats = async (req, res) => {
   try {
-    const [users, listings, reports, conversations] = await Promise.all([
+    const [users, listings, conversations] = await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact', head: true }),
       supabase.from('listings').select('id', { count: 'exact', head: true }),
-      supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('conversations').select('id', { count: 'exact', head: true })
     ])
 
     res.json({
       total_users: users.count || 0,
       total_listings: listings.count || 0,
-      pending_reports: reports.count || 0,
+      pending_reports: 0,
       total_conversations: conversations.count || 0
     })
   } catch (err) {
@@ -110,43 +109,12 @@ exports.deleteListing = async (req, res) => {
   }
 }
 
-exports.getReports = async (req, res) => {
-  try {
-    const { page = 1, limit = 20, status = 'pending', type } = req.query
-    const offset = (parseInt(page) - 1) * parseInt(limit)
-
-    let query = supabase
-      .from('reports')
-      .select(`*, reporter:reporter_id (id, username)`, { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + parseInt(limit) - 1)
-
-    if (status) query = query.eq('status', status)
-    if (type) query = query.eq('type', type)
-
-    const { data, error, count } = await query
-    if (error) throw error
-
-    res.json({ data: data || [], total: count, page: parseInt(page) })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
-  }
+exports.getReports = async (_req, res) => {
+  res.json({ data: [], total: 0, page: 1 })
 }
 
-exports.reviewReport = async (req, res) => {
-  try {
-    const { id } = req.params
-    const { action, note } = req.body
-
-    await supabase.from('reports').update({
-      status: action === 'dismiss' ? 'dismissed' : 'actioned',
-      admin_note: note
-    }).eq('id', id)
-
-    res.json({ message: 'Signalement traité' })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
-  }
+exports.reviewReport = async (_req, res) => {
+  res.json({ message: 'Fonctionnalité désactivée' })
 }
 
 exports.getCategories = async (req, res) => {
@@ -208,36 +176,16 @@ exports.deleteCategory = async (req, res) => {
   }
 }
 
-exports.getBrands = async (req, res) => {
-  try {
-    const { approved } = req.query
-    let query = supabase.from('brands').select('*').order('name')
-    if (approved !== undefined) query = query.eq('is_approved', approved === 'true')
-    const { data } = await query
-    res.json({ data: data || [] })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
-  }
+exports.getBrands = async (_req, res) => {
+  res.json({ data: [] })
 }
 
-exports.approveBrand = async (req, res) => {
-  try {
-    const { id } = req.params
-    await supabase.from('brands').update({ is_approved: true }).eq('id', id)
-    res.json({ message: 'Marque approuvée' })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
-  }
+exports.approveBrand = async (_req, res) => {
+  res.json({ message: 'Fonctionnalité désactivée' })
 }
 
-exports.deleteBrand = async (req, res) => {
-  try {
-    const { id } = req.params
-    await supabase.from('brands').delete().eq('id', id)
-    res.json({ message: 'Marque supprimée' })
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne' })
-  }
+exports.deleteBrand = async (_req, res) => {
+  res.json({ message: 'Fonctionnalité désactivée' })
 }
 
 exports.getForbiddenWords = async (req, res) => {

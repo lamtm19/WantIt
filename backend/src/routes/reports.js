@@ -1,30 +1,7 @@
 const express = require('express')
-const { body } = require('express-validator')
 const router  = express.Router()
-const ctrl    = require('../controllers/reportController')
-const { requireAuth } = require('../middleware/auth')
-const { validate }    = require('../middleware/validate')
 
-// Signaler une annonce
-router.post('/listing',
-  requireAuth,
-  [
-    body('listing_id').isUUID(),
-    body('reason').isLength({ min: 5, max: 500 }).trim()
-  ],
-  validate,
-  ctrl.reportListing
-)
-
-// Signaler un message
-router.post('/message',
-  requireAuth,
-  [
-    body('message_id').isUUID(),
-    body('reason').isLength({ min: 5, max: 500 }).trim()
-  ],
-  validate,
-  ctrl.reportMessage
-)
+// Fonctionnalité de signalement désactivée temporairement
+router.use((_req, res) => res.status(501).json({ error: 'Fonctionnalité non disponible' }))
 
 module.exports = router

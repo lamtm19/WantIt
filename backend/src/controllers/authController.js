@@ -169,8 +169,10 @@ exports.forgotPassword = async (req, res) => {
       options: { redirectTo: `${process.env.FRONTEND_URL}/reset-password` }
     })
 
-    if (linkData?.properties?.action_link) {
-      await sendResetEmail(email, linkData.properties.action_link)
+    if (linkData?.properties?.hashed_token) {
+      // On construit le lien directement avec token_hash pour éviter les problèmes PKCE
+      const resetLink = `${process.env.FRONTEND_URL}/reset-password?token_hash=${linkData.properties.hashed_token}&type=recovery`
+      await sendResetEmail(email, resetLink)
     }
   } catch (err) {
     console.error('forgotPassword error:', err)
@@ -210,10 +212,24 @@ async function sendResetEmail(to, resetLink) {
 
 exports.resetPassword = async (req, res) => {
   try {
-    const { password, access_token } = req.body
+    const { password, token_hash } = req.body
 
-    const { error } = await supabase.auth.admin.updateUserById(access_token, { password })
+    if (!token_hash) return res.status(400).json({ error: 'Token manquant' })
+
+    // Vérifier le token OTP de type recovery
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
+      token_hash,
+      type: 'recovery'
+    })
+
+    if (verifyError || !data?.user) {
+      console.error('resetPassword verifyOtp error:', verifyError)
+      return res.status(400).json({ error: 'Token invalide ou expiré' })
+    }
+
+    const { error } = await supabase.auth.admin.updateUserById(data.user.id, { password })
     if (error) return res.status(400).json({ error: error.message })
+
     res.json({ message: 'Mot de passe mis à jour' })
   } catch (err) {
     console.error('resetPassword error:', err)

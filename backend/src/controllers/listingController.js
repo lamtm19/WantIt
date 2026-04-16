@@ -1,13 +1,6 @@
 const supabase  = require('../config/supabase')
 const { v4: uuidv4 } = require('uuid')
 
-// Vérifier les mots interdits
-async function checkForbiddenWords(text) {
-  const { data: words } = await supabase.from('forbidden_words').select('word')
-  if (!words) return false
-  const lower = text.toLowerCase()
-  return words.some(({ word }) => lower.includes(word.toLowerCase()))
-}
 
 exports.getListings = async (req, res) => {
   try {
@@ -27,7 +20,7 @@ exports.getListings = async (req, res) => {
         profiles:user_id (id, username, avatar_url, city, postal_code),
         categories:category_id (id, name, slug),
         listing_images (url, sort_order),
-        listing_brands (brand_name, brands:brand_id (name))
+        listing_brands (brand_name)
       `)
       .eq('status', 'active')
       .not('profiles', 'is', null) // exclure les annonces dont le propriétaire est supprimé
@@ -60,8 +53,17 @@ exports.getListings = async (req, res) => {
     const { data, error } = await query
     if (error) throw error
 
-    // Filtrage par distance côté JS
+    // Filtrage côté JS
     let listings = data || []
+
+    // Filtre par marque (sur brand_name dans listing_brands)
+    if (brand) {
+      const brandLower = brand.toLowerCase()
+      listings = listings.filter(l =>
+        l.listing_brands?.some(b => b.brand_name?.toLowerCase().includes(brandLower))
+      )
+    }
+
     if (distance) {
       // Si lat/lon absents mais utilisateur connecté → utiliser son profil
       if ((!lat || !lon) && req.user?.id) {
@@ -134,7 +136,7 @@ exports.getListing = async (req, res) => {
         profiles:user_id (id, username, avatar_url, city, postal_code, region, created_at),
         categories:category_id (id, name, slug),
         listing_images (id, url, sort_order),
-        listing_brands (brand_name, brands:brand_id (name))
+        listing_brands (brand_name)
       `)
       .eq('id', id)
       .single()
@@ -157,7 +159,7 @@ exports.getUserListings = async (req, res) => {
 
     const { data, error } = await supabase
       .from('listings')
-      .select(`*, listing_images (url, sort_order), categories:category_id (name)`)
+      .select(`*, listing_images (url, sort_order), categories:category_id (name), listing_brands (brand_name)`)
       .eq('user_id', userId)
       .eq('status', status)
       .order('created_at', { ascending: false })
@@ -175,7 +177,7 @@ exports.getMyListings = async (req, res) => {
 
     let query = supabase
       .from('listings')
-      .select(`*, listing_images (url, sort_order), categories:category_id (name)`)
+      .select(`*, listing_images (url, sort_order), categories:category_id (name), listing_brands (brand_name)`)
       .eq('user_id', req.user.id)
       .order('created_at', { ascending: false })
 
@@ -196,12 +198,6 @@ exports.createListing = async (req, res) => {
       max_distance_km, conditions, is_urgent, brands
     } = req.body
 
-    // Vérifier mots interdits
-    const textToCheck = `${title} ${description || ''}`
-    if (await checkForbiddenWords(textToCheck)) {
-      return res.status(400).json({ error: 'Votre annonce contient des mots non autorisés' })
-    }
-
     if (parseFloat(price_min) > parseFloat(price_max)) {
       return res.status(400).json({ error: 'Le prix minimum doit être inférieur au prix maximum' })
     }
@@ -214,16 +210,19 @@ exports.createListing = async (req, res) => {
       .single()
 
     // Construire l'objet à insérer (category_id null si absent)
+    const parsedMin = parseFloat(price_min)
+    const parsedMax = parseFloat(price_max)
+
     const insertData = {
       user_id:         req.user.id,
       category_id:     category_id || null,
       title,
       description:     description || null,
-      price_min:       parseFloat(price_min),
-      price_max:       parseFloat(price_max),
-      max_distance_km: parseInt(max_distance_km),
+      price_min:       isNaN(parsedMin) ? 0 : parsedMin,
+      price_max:       isNaN(parsedMax) ? 0 : parsedMax,
+      max_distance_km: parseInt(max_distance_km) || 50,
       conditions:      Array.isArray(conditions) ? conditions : [],
-      is_urgent:       is_urgent || false,
+      is_urgent:       is_urgent === true,
       city:            profile?.city    || null,
       postal_code:     profile?.postal_code || null,
       region:          profile?.region  || null,
@@ -241,7 +240,8 @@ exports.createListing = async (req, res) => {
       console.error('[createListing] Supabase error:', JSON.stringify(error))
       return res.status(500).json({
         error: 'Erreur lors de la création de l\'annonce',
-        details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+        details: error.message,
+        code: error.code
       })
     }
 
@@ -251,14 +251,13 @@ exports.createListing = async (req, res) => {
       const seen = new Set()
       const brandInserts = brands
         .filter(b => {
-          const key = b.id ? `id:${b.id}` : `name:${(b.name || '').toLowerCase()}`
-          if (seen.has(key)) return false
+          const key = (b.name || '').toLowerCase().trim()
+          if (!key || seen.has(key)) return false
           seen.add(key)
           return true
         })
         .map(b => ({
           listing_id: listing.id,
-          brand_id:   b.id   || null,
           brand_name: b.name || null
         }))
 
@@ -289,19 +288,15 @@ exports.updateListing = async (req, res) => {
       .single()
 
     if (!existing) return res.status(404).json({ error: 'Annonce introuvable' })
-    if (existing.user_id !== req.user.id && !req.user.is_admin) {
+    if (existing.user_id !== req.user.id) {
       return res.status(403).json({ error: 'Non autorisé' })
-    }
-
-    if (updates.title || updates.description) {
-      const textToCheck = `${updates.title || ''} ${updates.description || ''}`
-      if (await checkForbiddenWords(textToCheck)) {
-        return res.status(400).json({ error: 'Contenu non autorisé' })
-      }
     }
 
     const allowedFields = ['title', 'description', 'category_id', 'price_min', 'price_max', 'max_distance_km', 'conditions', 'is_urgent']
     const filtered = Object.fromEntries(Object.entries(updates).filter(([k]) => allowedFields.includes(k)))
+    if ('price_min' in filtered) filtered.price_min = isNaN(parseFloat(filtered.price_min)) ? 0 : parseFloat(filtered.price_min)
+    if ('price_max' in filtered) filtered.price_max = isNaN(parseFloat(filtered.price_max)) ? 0 : parseFloat(filtered.price_max)
+    if ('is_urgent' in filtered) filtered.is_urgent = filtered.is_urgent === true
 
     const { data, error } = await supabase
       .from('listings')
@@ -311,6 +306,34 @@ exports.updateListing = async (req, res) => {
       .single()
 
     if (error) throw error
+
+    // Mettre à jour les marques si fournies
+    if (Array.isArray(updates.brands)) {
+      // Supprimer les anciennes marques
+      await supabase.from('listing_brands').delete().eq('listing_id', id)
+
+      // Insérer les nouvelles marques (dédupliquées)
+      if (updates.brands.length > 0) {
+        const seen = new Set()
+        const brandInserts = updates.brands
+          .filter(b => {
+            const key = (b.name || '').toLowerCase().trim()
+            if (!key || seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
+          .map(b => ({
+            listing_id: id,
+            brand_name: b.name
+          }))
+
+        if (brandInserts.length > 0) {
+          const { error: brandError } = await supabase.from('listing_brands').insert(brandInserts)
+          if (brandError) console.warn('[updateListing] brand insert warning:', brandError.message)
+        }
+      }
+    }
+
     res.json(data)
   } catch (err) {
     res.status(500).json({ error: 'Erreur interne' })
@@ -329,7 +352,7 @@ exports.updateStatus = async (req, res) => {
       .single()
 
     if (!existing) return res.status(404).json({ error: 'Annonce introuvable' })
-    if (existing.user_id !== req.user.id && !req.user.is_admin) {
+    if (existing.user_id !== req.user.id) {
       return res.status(403).json({ error: 'Non autorisé' })
     }
 
@@ -358,7 +381,7 @@ exports.deleteListing = async (req, res) => {
       .single()
 
     if (!existing) return res.status(404).json({ error: 'Annonce introuvable' })
-    if (existing.user_id !== req.user.id && !req.user.is_admin) {
+    if (existing.user_id !== req.user.id) {
       return res.status(403).json({ error: 'Non autorisé' })
     }
 

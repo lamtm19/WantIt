@@ -62,7 +62,6 @@ app.use('/api/conversations', require('./routes/conversations'))
 app.use('/api/messages',      require('./routes/messages'))
 app.use('/api/reviews',       require('./routes/reviews'))
 app.use('/api/reports',       require('./routes/reports'))
-app.use('/api/admin',         require('./routes/admin'))
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', env: process.env.NODE_ENV }))

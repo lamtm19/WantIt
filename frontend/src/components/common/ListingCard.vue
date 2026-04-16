@@ -55,11 +55,17 @@
         </span>
       </div>
 
-      <!-- Vendeur -->
-      <div class="flex items-center gap-2 mt-2 pt-2 border-t border-gray-50">
-        <UserAvatar :profile="listing.profiles" size="xs" />
-        <span class="text-xs text-gray-500 truncate">{{ listing.profiles?.username }}</span>
-        <span class="ml-auto text-xs text-gray-400">{{ timeAgo(listing.created_at) }}</span>
+      <!-- Marques ou vendeur -->
+      <div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-50 flex-wrap">
+        <template v-if="brands.length">
+          <span v-for="b in brands.slice(0, 2)" :key="b" class="badge badge-gray text-xs">{{ b }}</span>
+          <span v-if="brands.length > 2" class="badge badge-gray text-xs">+{{ brands.length - 2 }}</span>
+        </template>
+        <template v-else-if="listing.profiles">
+          <UserAvatar :profile="listing.profiles" size="xs" />
+          <span class="text-xs text-gray-500 truncate">{{ listing.profiles.username }}</span>
+        </template>
+        <span class="ml-auto text-xs text-gray-400 shrink-0">{{ timeAgo(listing.created_at) }}</span>
       </div>
     </div>
   </RouterLink>
@@ -78,6 +84,10 @@ const firstImage = computed(() => {
   const imgs = props.listing.listing_images || []
   return imgs.sort((a, b) => a.sort_order - b.sort_order)[0]?.url || null
 })
+
+const brands = computed(() =>
+  (props.listing.listing_brands || []).map(b => b.brand_name).filter(Boolean)
+)
 
 const locationLabel = computed(() => {
   const l = props.listing

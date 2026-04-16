@@ -132,8 +132,6 @@ const currentFilters = ref({})
 
 onMounted(async () => {
   await store.fetchCategories()
-
-  // Recherche depuis la barre de navigation
   if (route.query.q) {
     await store.searchListings(route.query.q)
   } else {
@@ -147,6 +145,8 @@ watch(() => route.query.q, async (q) => {
 })
 
 async function handleFilter(filters) {
+  // Garder le filtre catégorie actif (géré par les boutons)
+  if (activeCategory.value) filters.category_id = activeCategory.value
   currentFilters.value = filters
   showFilters.value = false
   await store.fetchListings({ ...filters, sort: sort.value }, true)

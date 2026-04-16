@@ -30,16 +30,5 @@ router.get('/:id/rating', ctrl.getUserRating)
 // Avis reçus
 router.get('/:id/reviews', ctrl.getUserReviews)
 
-// Bloquer un utilisateur
-router.post('/:id/block', requireAuth, ctrl.blockUser)
-
-// Débloquer un utilisateur
-router.delete('/:id/block', requireAuth, ctrl.unblockUser)
-
-// Liste des utilisateurs bloqués
-router.get('/me/blocked', requireAuth, ctrl.getBlockedUsers)
-
-// Signaler un utilisateur
-router.post('/:id/report', requireAuth, ctrl.reportUser)
 
 module.exports = router

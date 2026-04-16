@@ -20,18 +20,6 @@
           </div>
         </div>
 
-        <div v-if="auth.isAuthenticated && auth.profile?.id !== profile.id" class="flex gap-2">
-          <button
-            @click="toggleBlock"
-            :class="isBlocked ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'"
-          >
-            <Ban class="w-4 h-4" />
-            {{ isBlocked ? 'Débloquer' : 'Bloquer' }}
-          </button>
-          <button @click="showReport = true" class="btn-secondary btn-sm">
-            <Flag class="w-4 h-4" />
-          </button>
-        </div>
       </div>
     </div>
 
@@ -59,21 +47,6 @@
     </div>
     <div v-else class="text-center py-8 text-gray-400">Aucun avis</div>
 
-    <!-- Modal signalement -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div v-if="showReport" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="showReport = false">
-          <div class="card p-6 w-full max-w-sm">
-            <h3 class="font-bold text-lg mb-4">Signaler {{ profile.username }}</h3>
-            <textarea v-model="reportReason" class="input resize-none mb-4" rows="3" placeholder="Raison du signalement..." />
-            <div class="flex gap-3">
-              <button class="btn-secondary flex-1" @click="showReport = false">Annuler</button>
-              <button class="btn-danger flex-1" @click="sendReport">Signaler</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
   </div>
 
   <div v-else-if="loading" class="max-w-4xl mx-auto px-4 py-8">
@@ -84,27 +57,20 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { MapPin, Ban, Flag } from 'lucide-vue-next'
-import { useToast } from 'vue-toastification'
-import { useAuthStore } from '@/stores/auth'
+import { MapPin } from 'lucide-vue-next'
 import { useListingStore } from '@/stores/listings'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import StarRating from '@/components/common/StarRating.vue'
 import ListingCard from '@/components/common/ListingCard.vue'
 import api from '@/services/api'
 
-const route  = useRoute()
-const auth   = useAuthStore()
-const store  = useListingStore()
-const toast  = useToast()
+const route = useRoute()
+const store = useListingStore()
 
-const profile      = ref(null)
-const listings     = ref([])
-const reviews      = ref([])
-const loading      = ref(true)
-const isBlocked    = ref(false)
-const showReport   = ref(false)
-const reportReason = ref('')
+const profile  = ref(null)
+const listings = ref([])
+const reviews  = ref([])
+const loading  = ref(true)
 
 const locationLabel = computed(() => {
   const p = profile.value
@@ -134,27 +100,4 @@ onMounted(async () => {
   }
 })
 
-async function toggleBlock() {
-  const id = profile.value.id
-  try {
-    if (isBlocked.value) {
-      await api.delete(`/api/users/${id}/block`)
-      isBlocked.value = false
-      toast.success('Utilisateur débloqué')
-    } else {
-      await api.post(`/api/users/${id}/block`)
-      isBlocked.value = true
-      toast.success('Utilisateur bloqué')
-    }
-  } catch { toast.error('Erreur') }
-}
-
-async function sendReport() {
-  try {
-    await api.post(`/api/users/${profile.value.id}/report`, { reason: reportReason.value })
-    showReport.value  = false
-    reportReason.value = ''
-    toast.success('Signalement envoyé')
-  } catch { toast.error('Erreur') }
-}
 </script>
