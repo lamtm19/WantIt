@@ -19,7 +19,7 @@ async function send(to, subject, html) {
         'Content-Type':  'application/json'
       },
       body: JSON.stringify({
-        from:    EMAIL_FROM,
+        from:    "EMAIL_FROM",
         to:      [to],
         subject,
         html
