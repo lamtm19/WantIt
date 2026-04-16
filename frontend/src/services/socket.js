@@ -13,6 +13,8 @@ export function onSocketConnect(cb) {
   onConnectCallbacks.add(cb)
   // Si déjà connecté, appeler immédiatement
   if (socket?.connected) cb(socket)
+  // Retourne une fonction de nettoyage
+  return () => onConnectCallbacks.delete(cb)
 }
 
 export function connectSocket() {

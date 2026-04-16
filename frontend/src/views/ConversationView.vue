@@ -39,18 +39,18 @@
 
     <!-- Bannière annonce clôturée -->
     <div v-if="conv.listings?.status !== 'active'" class="bg-amber-50 px-4 py-2 border-b border-amber-100 text-sm text-amber-700 text-center shrink-0">
-      ⚠️ Cette annonce n'est plus active
+      Cette annonce n'est plus active
     </div>
 
     <!-- Bannière avis disponible -->
     <div v-if="transaction && !hasReviewed" class="bg-green-50 px-4 py-2.5 border-b border-green-100 shrink-0 flex items-center justify-between gap-3">
-      <p class="text-sm text-green-800 font-medium">✅ Transaction validée — laissez un avis !</p>
+      <p class="text-sm text-green-800 font-medium">Transaction validée — laissez un avis !</p>
       <button @click="showReviewModal = true" class="btn-primary btn-sm shrink-0">
         ⭐ Laisser un avis
       </button>
     </div>
     <div v-else-if="transaction && hasReviewed" class="bg-green-50 px-4 py-2.5 border-b border-green-100 shrink-0 text-center">
-      <p class="text-sm text-green-700">✅ Transaction validée — avis déjà publié</p>
+      <p class="text-sm text-green-700">Transaction validée — avis déjà publié</p>
     </div>
 
     <!-- Messages -->
@@ -233,7 +233,7 @@ import {
 import { useToast } from 'vue-toastification'
 import { useAuthStore } from '@/stores/auth'
 import { useConversationStore } from '@/stores/conversations'
-import { getSocket, joinConversation, leaveConversation, emitTypingStart, emitTypingStop, markMessagesRead } from '@/services/socket'
+import { getSocket, onSocketConnect, joinConversation, leaveConversation, emitTypingStart, emitTypingStop, markMessagesRead } from '@/services/socket'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import api from '@/services/api'
@@ -285,6 +285,7 @@ function canRespondToOffer(msg) {
 }
 
 let typingTimer = null
+let removeSocketConnect = null
 
 onMounted(async () => {
   try {
@@ -309,12 +310,14 @@ onMounted(async () => {
       }
     } catch {}
 
-    // Écouter les nouveaux messages
-    const socket = getSocket()
-    if (socket) {
-      socket.on('new:message', (msg) => {
+    // Écouter les nouveaux messages — re-enregistré à chaque (re)connexion socket
+    removeSocketConnect = onSocketConnect((sock) => {
+      // Re-rejoindre la room après reconnexion
+      sock.emit('join:conversation', convId)
+
+      sock.off('new:message')
+      sock.on('new:message', (msg) => {
         if (msg.conversation_id === convId) {
-          // Éviter les doublons
           const exists = messages.value.find(m => m.id === msg.id)
           if (!exists) {
             messages.value.push(msg)
@@ -325,35 +328,39 @@ onMounted(async () => {
         }
       })
 
-      // Mise à jour du statut d'une offre
-      socket.on('offer:updated', ({ message_id, offer_status }) => {
+      sock.off('offer:updated')
+      sock.on('offer:updated', ({ message_id, offer_status }) => {
         const msg = messages.value.find(m => m.id === message_id)
         if (msg) msg.offer_status = offer_status
       })
 
-      // Transaction validée par l'autre personne
-      socket.on('transaction:validated', ({ transaction: tx }) => {
+      sock.off('transaction:validated')
+      sock.on('transaction:validated', ({ transaction: tx }) => {
         transaction.value = tx
         if (conv.value?.listings) conv.value.listings.status = 'found'
         toast.success('La transaction a été validée !')
       })
 
-      socket.on('typing:start', ({ user_id }) => {
+      sock.off('typing:start')
+      sock.on('typing:start', ({ user_id }) => {
         if (user_id !== auth.profile?.id) otherTyping.value = true
       })
-      socket.on('typing:stop', ({ user_id }) => {
+      sock.off('typing:stop')
+      sock.on('typing:stop', ({ user_id }) => {
         if (user_id !== auth.profile?.id) otherTyping.value = false
       })
-      socket.on('error:message', ({ message }) => {
+      sock.off('error:message')
+      sock.on('error:message', ({ message }) => {
         toast.error(message || 'Erreur lors de l\'envoi')
       })
-    }
+    })
   } finally {
     loading.value = false
   }
 })
 
 onUnmounted(() => {
+  removeSocketConnect?.()
   leaveConversation(convId)
   const socket = getSocket()
   if (socket) {
