@@ -23,7 +23,7 @@
 
 ## 1. Présentation du projet
 
-**WantIt** est une application web de mise en relation locale conçue dans le cadre du projet fil rouge EFREI B2.
+**WantIt** est une application web de mise en relation locale conçue dans le cadre du projet fil rouge EFREI.
 
 L'idée repose sur un modèle inversé par rapport aux plateformes classiques (Vinted, Leboncoin) : ce sont les **acheteurs qui publient ce qu'ils recherchent**, et les **vendeurs qui les contactent**. Les échanges se font exclusivement en main propre, sans paiement intégré.
 
@@ -214,18 +214,20 @@ VITE_SUPABASE_ANON_KEY=eyJ...      # Clé anon/public
 
 | Opération | Description |
 |-----------|-------------|
+| **Create** | Pseudo, Email, Mot de passe, Corfirmation de mdp, Localisation et Email de confirmation |
 | **Read** | Profil public avec annonces et avis reçus |
 | **Update** | Pseudo, ville, code postal, région, coordonnées GPS |
+| **Delete** | Suppression dans les Users de Supabase |
 | Avatar | Upload et remplacement d'image de profil |
 | Mot de passe | Modification depuis les paramètres |
 
-### Messagerie temps réel
+### Messagerie
 
-- Chat instantané via **Socket.io** (sans rechargement de page)
+- Chat instantané via **Socket.io**
 - Messages texte et envoi de photos
 - **Système d'offres** : proposer un prix, accepter, refuser ou contre-offrir
 - Indicateur "en train d'écrire"
-- Compteur de messages non lus (badge en temps réel)
+- Compteur de messages non lus
 - Persistance des messages en base de données
 
 ### Transactions & Avis
@@ -309,10 +311,7 @@ wantit/
 │   └── package.json
 │
 └── database/
-    └── migrations/               # Scripts SQL à exécuter dans l'ordre
-        ├── 001_initial_schema.sql
-        ├── 002_...sql
-        └── ...
+    └── schema.sql
 ```
 
 ---
@@ -349,13 +348,13 @@ wantit/
 
 ## 11. Améliorations futures
 
+- **Panel Admin** : Modération des mots-clés illégaux et filtrage automatique, signalement de contenus inappropriés et blocage d'utilisateur entre membres
 - **Géolocalisation réelle** : filtrage des annonces par rayon GPS autour de l'utilisateur
 - **Notifications push** : alertes navigateur pour les nouveaux messages (Web Push API)
 - **Application mobile** : version React Native ou PWA
-- **Système de modération** : signalement de contenus inappropriés, gestion par un panel d'administration
 - **Recherche avancée** : filtres combinés sauvegardés, alertes email pour nouvelles annonces correspondantes
 - **Vérification d'identité** : badge "utilisateur vérifié" après validation de pièce d'identité
-- **Statistiques vendeur** : tableau de bord avec nombre de contacts, taux de réponse, note moyenne
+- **Statistiques vendeur** : tableau de bord avec nombre de contacts, taux de réponse
 
 ---
 

@@ -4,7 +4,7 @@
 
 -- Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis"; -- pour les calculs de distance
+CREATE EXTENSION IF NOT EXISTS "postgis";
 
 -- ============================================================
 -- PROFILS UTILISATEURS
@@ -54,17 +54,6 @@ INSERT INTO categories (name, slug, icon, sort_order) VALUES
   ('Autre',          'autre',          'package',        9);
 
 -- ============================================================
--- MARQUES
--- ============================================================
-
-CREATE TABLE brands (
-  id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name        VARCHAR(100) NOT NULL UNIQUE,
-  is_approved BOOLEAN      DEFAULT TRUE,
-  created_at  TIMESTAMPTZ  DEFAULT NOW()
-);
-
--- ============================================================
 -- ANNONCES DE RECHERCHE
 -- ============================================================
 
@@ -109,23 +98,15 @@ CREATE TABLE listing_images (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Marques associées à une annonce
+-- Marques associées à une annonce (saisie libre)
 CREATE TABLE listing_brands (
-  id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  listing_id  UUID        NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
-  brand_id    UUID        REFERENCES brands(id) ON DELETE SET NULL,
-  brand_name  VARCHAR(100) -- si la marque est saisie librement
+  id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+  listing_id  UUID         NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  brand_name  VARCHAR(100) NOT NULL
 );
 
--- Unicité : une marque référencée ne peut apparaître qu'une fois par annonce
-CREATE UNIQUE INDEX uq_listing_brand_id
-  ON listing_brands (listing_id, brand_id)
-  WHERE brand_id IS NOT NULL;
-
--- Unicité : un nom libre ne peut apparaître qu'une fois par annonce (sans brand_id)
 CREATE UNIQUE INDEX uq_listing_brand_name
-  ON listing_brands (listing_id, brand_name)
-  WHERE brand_id IS NULL AND brand_name IS NOT NULL;
+  ON listing_brands (listing_id, brand_name);
 
 -- ============================================================
 -- CONVERSATIONS
@@ -159,7 +140,7 @@ CREATE TABLE messages (
   -- Pour les offres
   offer_amount    DECIMAL(10, 2),
   offer_status    offer_status DEFAULT 'pending',
-  offer_parent_id UUID         REFERENCES messages(id), -- pour les contre-offres
+  offer_parent_id UUID         REFERENCES messages(id),
   is_read         BOOLEAN      DEFAULT FALSE,
   created_at      TIMESTAMPTZ  DEFAULT NOW()
 );
@@ -197,47 +178,6 @@ CREATE TABLE reviews (
 );
 
 -- ============================================================
--- SIGNALEMENTS
--- ============================================================
-
-CREATE TYPE report_type   AS ENUM ('listing', 'user', 'message', 'conversation');
-CREATE TYPE report_status AS ENUM ('pending', 'reviewed', 'dismissed', 'actioned');
-
-CREATE TABLE reports (
-  id          UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-  reporter_id UUID          NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  type        report_type   NOT NULL,
-  target_id   UUID          NOT NULL, -- listing_id, user_id ou message_id
-  reason      TEXT          NOT NULL,
-  status      report_status DEFAULT 'pending',
-  admin_note  TEXT,
-  created_at  TIMESTAMPTZ   DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ   DEFAULT NOW()
-);
-
--- ============================================================
--- BLOCAGES
--- ============================================================
-
-CREATE TABLE blocked_users (
-  blocker_id  UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  blocked_id  UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  created_at  TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (blocker_id, blocked_id)
-);
-
--- ============================================================
--- MOTS INTERDITS
--- ============================================================
-
-CREATE TABLE forbidden_words (
-  id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  word       VARCHAR(100) NOT NULL UNIQUE,
-  created_by UUID        REFERENCES profiles(id),
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ============================================================
 -- INDEX
 -- ============================================================
 
@@ -250,7 +190,6 @@ CREATE INDEX idx_messages_conv       ON messages(conversation_id, created_at);
 CREATE INDEX idx_conversations_buyer  ON conversations(buyer_id);
 CREATE INDEX idx_conversations_seller ON conversations(seller_id);
 CREATE INDEX idx_reviews_reviewed    ON reviews(reviewed_id);
-CREATE INDEX idx_reports_status      ON reports(status);
 
 -- ============================================================
 -- FONCTIONS UTILITAIRES
@@ -313,20 +252,23 @@ ALTER TABLE conversations     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reviews           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE reports           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE blocked_users     ENABLE ROW LEVEL SECURITY;
 
 -- Profils : lecture publique, écriture par le propriétaire
 CREATE POLICY "profiles_read_all"   ON profiles FOR SELECT USING (TRUE);
 CREATE POLICY "profiles_write_own"  ON profiles FOR ALL   USING (auth.uid() = id);
 
--- Listings : lecture publique (sauf bannis), écriture par le propriétaire
+-- Listings : lecture publique, écriture par le propriétaire
 CREATE POLICY "listings_read_all"  ON listings FOR SELECT USING (TRUE);
 CREATE POLICY "listings_write_own" ON listings FOR ALL   USING (auth.uid() = user_id);
 
 -- Images : lecture publique, écriture par le propriétaire de l'annonce
 CREATE POLICY "images_read_all"  ON listing_images FOR SELECT USING (TRUE);
 CREATE POLICY "images_write_own" ON listing_images FOR ALL
+  USING (EXISTS (SELECT 1 FROM listings l WHERE l.id = listing_id AND l.user_id = auth.uid()));
+
+-- Marques : lecture publique, écriture par le propriétaire de l'annonce
+CREATE POLICY "brands_read_all"  ON listing_brands FOR SELECT USING (TRUE);
+CREATE POLICY "brands_write_own" ON listing_brands FOR ALL
   USING (EXISTS (SELECT 1 FROM listings l WHERE l.id = listing_id AND l.user_id = auth.uid()));
 
 -- Conversations : accès aux participants uniquement
@@ -348,10 +290,3 @@ CREATE POLICY "tx_access" ON transactions FOR ALL
 -- Avis : lecture publique, écriture par le revieweur
 CREATE POLICY "reviews_read_all"  ON reviews FOR SELECT USING (TRUE);
 CREATE POLICY "reviews_write_own" ON reviews FOR ALL   USING (auth.uid() = reviewer_id);
-
--- Signalements : écriture par n'importe quel utilisateur, lecture par l'admin
-CREATE POLICY "reports_write" ON reports FOR INSERT WITH CHECK (auth.uid() = reporter_id);
-CREATE POLICY "reports_read_own" ON reports FOR SELECT USING (auth.uid() = reporter_id);
-
--- Blocages : gestion par le bloqueur
-CREATE POLICY "blocked_own" ON blocked_users FOR ALL USING (auth.uid() = blocker_id);
