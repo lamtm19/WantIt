@@ -33,12 +33,12 @@
         <div class="flex gap-3 items-center">
           <div class="flex-1">
             <label class="label">Min (€)</label>
-            <input v-model.number="form.price_min" type="number" class="input" min="0" />
+            <input v-model.number="form.price_min" type="number" class="input" min="0" @wheel.prevent="$event.target.blur()" />
           </div>
           <span class="text-gray-400 mt-5">–</span>
           <div class="flex-1">
             <label class="label">Max (€)</label>
-            <input v-model.number="form.price_max" type="number" class="input" min="0" />
+            <input v-model.number="form.price_max" type="number" class="input" min="0" @wheel.prevent="$event.target.blur()" />
           </div>
         </div>
       </div>
@@ -85,7 +85,7 @@
       <div class="card p-5">
         <h2 class="font-bold mb-4">Distance maximale</h2>
         <div class="relative max-w-[200px]">
-          <input v-model.number="form.max_distance_km" type="number" class="input pr-12" min="1" />
+          <input v-model.number="form.max_distance_km" type="number" class="input pr-12" min="1" @wheel.prevent="$event.target.blur()" />
           <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">km</span>
         </div>
       </div>
