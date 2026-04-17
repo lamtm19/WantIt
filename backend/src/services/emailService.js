@@ -48,28 +48,98 @@ function baseTemplate(content) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-    .card { background: white; border-radius: 12px; padding: 32px; max-width: 560px; margin: 0 auto; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .logo { font-size: 28px; font-weight: 800; color: #09b668; margin-bottom: 24px; }
-    h2 { color: #1a1a1a; margin: 0 0 16px; font-size: 20px; }
-    p { color: #555; line-height: 1.6; margin: 0 0 12px; }
-    .btn {
-      display: inline-block; background: #09b668; color: white !important;
-      padding: 12px 24px; border-radius: 8px; text-decoration: none;
-      font-weight: 600; margin: 16px 0; font-size: 15px;
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f1f1f1;
+      margin: 0;
+      padding: 32px 16px;
+      -webkit-font-smoothing: antialiased;
     }
-    .footer { margin-top: 24px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 16px; }
+    .wrapper { max-width: 560px; margin: 0 auto; }
+    .card {
+      background: rgba(255, 255, 255, 0.97);
+      border-radius: 28px;
+      padding: 40px 40px 32px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.06);
+    }
+    .logo {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f0f0f;
+      letter-spacing: -0.04em;
+      margin-bottom: 32px;
+      display: inline-block;
+      background: linear-gradient(135deg, #000000 0%, #3c3b3b 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    h2 {
+      color: #0f0f0f;
+      margin: 0 0 14px;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.2;
+    }
+    p {
+      color: #6b7280;
+      line-height: 1.65;
+      margin: 0 0 12px;
+      font-size: 14px;
+    }
+    strong { color: #1a1a1a; font-weight: 600; }
+    .btn {
+      display: inline-block;
+      background-color: #111111;
+      background-image: linear-gradient(135deg, #000000 0%, #3c3b3b 100%);
+      color: #ffffff !important;
+      -webkit-text-fill-color: #ffffff !important;
+      padding: 13px 28px;
+      border-radius: 9999px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: -0.01em;
+      margin: 20px 0 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid rgba(26, 26, 26, 0.07);
+      margin: 28px 0 20px;
+    }
+    .footer {
+      font-size: 12px;
+      color: #a3a3a3;
+      line-height: 1.6;
+    }
+    .stars { color: #1a1a1a; font-size: 16px; letter-spacing: 2px; }
+    .chip {
+      display: inline-block;
+      background: #f5f5f5;
+      border-radius: 9999px;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="logo">WantIt</div>
-    ${content}
-    <div class="footer">
-      Cette plateforme met uniquement en relation des utilisateurs.
-      Les transactions se font en main propre.<br><br>
-      © ${new Date().getFullYear()} WantIt
+  <div class="wrapper">
+    <div class="card">
+      <div class="logo">WantIt</div>
+      ${content}
+      <hr class="divider">
+      <div class="footer">
+        Cette plateforme met uniquement en relation des particuliers.<br>
+        Les échanges se font exclusivement en main propre, sans paiement intégré.<br><br>
+        © ${new Date().getFullYear()} WantIt — Tous droits réservés
+      </div>
     </div>
   </div>
 </body>
@@ -81,11 +151,13 @@ exports.sendConfirmationEmail = async (to, username, confirmationLink) => {
     to,
     'Confirmez votre compte WantIt',
     baseTemplate(`
-      <h2>Bienvenue sur WantIt, ${username} !</h2>
-      <p>Cliquez sur le bouton ci-dessous pour confirmer votre adresse email et activer votre compte.</p>
+      <div class="chip">Bienvenue 👋</div>
+      <h2>Confirmez votre adresse email</h2>
+      <p>Bonjour <strong>${username}</strong>, votre compte WantIt est presque prêt.</p>
+      <p>Cliquez sur le bouton ci-dessous pour confirmer votre adresse et commencer à publier vos recherches.</p>
       <a class="btn" href="${confirmationLink}">Confirmer mon compte</a>
-      <p style="font-size:12px;color:#999;margin-top:16px;">
-        Ce lien expire dans 24h. Si vous n'avez pas créé de compte, ignorez cet email.
+      <p style="font-size:12px;color:#a3a3a3;margin-top:14px;">
+        Ce lien expire dans 24 heures. Si vous n'avez pas créé de compte, ignorez cet email.
       </p>
     `)
   )
@@ -96,11 +168,11 @@ exports.sendNewMessageEmail = async (to, recipientName, senderName, listingTitle
     to,
     `Nouveau message de ${senderName}`,
     baseTemplate(`
-      <h2>Nouveau message</h2>
+      <div class="chip">Message reçu</div>
+      <h2>Vous avez un nouveau message</h2>
       <p>Bonjour <strong>${recipientName}</strong>,</p>
-      <p><strong>${senderName}</strong> vous a envoyé un message concernant l'annonce
-        <strong>"${listingTitle}"</strong>.</p>
-      <a class="btn" href="${BASE}/messages/${conversationId}">Voir le message</a>
+      <p><strong>${senderName}</strong> vous a contacté au sujet de votre annonce <strong>"${listingTitle}"</strong>.</p>
+      <a class="btn" href="${BASE}/messages/${conversationId}">Voir la conversation</a>
     `)
   )
 }
@@ -110,10 +182,11 @@ exports.sendNewOfferEmail = async (to, recipientName, senderName, listingTitle, 
     to,
     `Nouvelle offre de ${senderName}`,
     baseTemplate(`
-      <h2>Nouvelle offre reçue</h2>
+      <div class="chip">Offre reçue</div>
+      <h2>${senderName} vous propose ${amount} €</h2>
       <p>Bonjour <strong>${recipientName}</strong>,</p>
-      <p><strong>${senderName}</strong> vous propose <strong>${amount} €</strong>
-        pour l'annonce <strong>"${listingTitle}"</strong>.</p>
+      <p><strong>${senderName}</strong> a fait une offre de <strong>${amount} €</strong> sur votre annonce <strong>"${listingTitle}"</strong>.</p>
+      <p>Vous pouvez accepter, refuser ou faire une contre-offre directement dans le chat.</p>
       <a class="btn" href="${BASE}/messages/${conversationId}">Répondre à l'offre</a>
     `)
   )
@@ -125,11 +198,29 @@ exports.sendNewReviewEmail = async (to, recipientName, reviewerName, rating, lis
     to,
     `Nouvel avis de ${reviewerName}`,
     baseTemplate(`
+      <div class="chip">Avis reçu</div>
       <h2>Vous avez reçu un avis</h2>
       <p>Bonjour <strong>${recipientName}</strong>,</p>
-      <p><strong>${reviewerName}</strong> vous a laissé un avis <span style="color:#f59e0b">${stars}</span>
-        suite à la transaction concernant <strong>"${listingTitle}"</strong>.</p>
+      <p><strong>${reviewerName}</strong> a laissé un avis suite à la transaction <strong>"${listingTitle}"</strong>.</p>
+      <p><span class="stars">${stars}</span></p>
       <a class="btn" href="${BASE}/profile">Voir mon profil</a>
+    `)
+  )
+}
+
+exports.sendResetPasswordEmail = async (to, resetLink) => {
+  return send(
+    to,
+    'Réinitialisation de votre mot de passe WantIt',
+    baseTemplate(`
+      <div class="chip">Sécurité</div>
+      <h2>Réinitialisez votre mot de passe</h2>
+      <p>Vous avez demandé à réinitialiser le mot de passe de votre compte WantIt.</p>
+      <p>Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de passe.</p>
+      <a class="btn" href="${resetLink}">Réinitialiser mon mot de passe</a>
+      <p style="font-size:12px;color:#a3a3a3;margin-top:14px;">
+        Ce lien expire dans 1 heure. Si vous n'avez pas fait cette demande, ignorez cet email.
+      </p>
     `)
   )
 }
@@ -139,11 +230,11 @@ exports.sendTransactionValidatedEmail = async (to, recipientName, buyerName, lis
     to,
     `Transaction validée par ${buyerName}`,
     baseTemplate(`
-      <h2>Transaction validée !</h2>
+      <div class="chip">Transaction confirmée</div>
+      <h2>L'échange a bien eu lieu !</h2>
       <p>Bonjour <strong>${recipientName}</strong>,</p>
-      <p><strong>${buyerName}</strong> a confirmé la transaction pour
-        <strong>"${listingTitle}"</strong>.</p>
-      <p>Vous pouvez maintenant laisser un avis mutuellement.</p>
+      <p><strong>${buyerName}</strong> a confirmé la transaction pour <strong>"${listingTitle}"</strong>.</p>
+      <p>Vous pouvez maintenant vous laisser des avis mutuellement depuis votre profil.</p>
       <a class="btn" href="${BASE}/profile">Laisser un avis</a>
     `)
   )

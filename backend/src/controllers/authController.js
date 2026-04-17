@@ -181,33 +181,7 @@ exports.forgotPassword = async (req, res) => {
 }
 
 async function sendResetEmail(to, resetLink) {
-  const RESEND_API_KEY = process.env.RESEND_API_KEY
-  const EMAIL_FROM     = process.env.EMAIL_FROM || 'WantIt <onboarding@resend.dev>'
-  if (!RESEND_API_KEY) return
-
-  const html = `
-<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-<style>body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px;}
-.card{background:white;border-radius:12px;padding:32px;max-width:560px;margin:0 auto;}
-.logo{font-size:28px;font-weight:800;color:#09b668;margin-bottom:24px;}
-.btn{display:inline-block;background:#09b668;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0;}
-</style></head><body><div class="card">
-<div class="logo">WantIt</div>
-<h2 style="color:#1a1a1a">Réinitialisation de votre mot de passe</h2>
-<p style="color:#555">Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous :</p>
-<a class="btn" href="${resetLink}">Réinitialiser mon mot de passe</a>
-<p style="color:#999;font-size:12px;margin-top:16px">Ce lien expire dans 1h. Si vous n'avez pas fait cette demande, ignorez cet email.</p>
-</div></body></html>`
-
-  try {
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: EMAIL_FROM, to: [to], subject: 'Réinitialisation de votre mot de passe WantIt', html })
-    })
-  } catch (err) {
-    console.error('sendResetEmail error:', err.message)
-  }
+  await emailService.sendResetPasswordEmail(to, resetLink)
 }
 
 exports.resetPassword = async (req, res) => {
